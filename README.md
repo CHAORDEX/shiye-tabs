@@ -1,33 +1,39 @@
-This is a [Plasmo extension](https://docs.plasmo.com/) project bootstrapped with [`plasmo init`](https://www.npmjs.com/package/plasmo).
+# 标签页收集器
 
-## Getting Started
+一个基于 Plasmo 框架的浏览器插件，用于一键收集和管理浏览器标签页。
 
-First, run the development server:
+## 功能
+
+- 🔍 一键收集当前窗口所有标签页
+- 📋 清晰展示所有收集的链接
+- 🚀 一键打开所有收集的链接
+- 👆 单击打开单个链接
+- 🗑️ 清空收集列表
+
+## 开发
 
 ```bash
-pnpm dev
-# or
 npm run dev
 ```
 
-Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
-
-You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
-
-For further guidance, [visit our Documentation](https://docs.plasmo.com/)
-
-## Making production build
-
-Run the following:
+## 构建
 
 ```bash
-pnpm build
-# or
 npm run build
 ```
 
-This should create a production bundle for your extension, ready to be zipped and published to the stores.
+构建完成后，在 `build/chrome-mv3-dev` 或 `build/chrome-mv3-prod` 目录中找到插件文件。
 
-## Submit to the webstores
+## 安装
 
-The easiest way to deploy your Plasmo extension is to use the built-in [bpp](https://bpp.browser.market) GitHub action. Prior to using this action however, make sure to build your extension and upload the first version to the store to establish the basic credentials. Then, simply follow [this setup instruction](https://docs.plasmo.com/framework/workflows/submit) and you should be on your way for automated submission!
+1. 打开 Chrome 浏览器，访问 `chrome://extensions/`
+2. 开启右上角的"开发者模式"
+3. 点击"加载已解压的扩展程序"
+4. 选择 `build/chrome-mv3-dev` 目录
+
+## 使用
+
+1. 点击浏览器工具栏中的插件图标
+2. 点击"收集所有标签页"按钮
+3. 查看收集的标签页列表
+4. 点击"打开所有链接"或单击某个链接打开
