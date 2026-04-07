@@ -1,4 +1,4 @@
-export {}
+export { }
 
 interface TabInfo {
   title: string
@@ -13,6 +13,7 @@ interface Collection {
 }
 
 const COLLECTION_URL = () => chrome.runtime.getURL("tabs/collection.html")
+const GUIDE_URL = () => chrome.runtime.getURL("tabs/guide.html")
 
 const SKIP_PREFIXES = [
   "chrome://",
@@ -98,7 +99,7 @@ async function collectAllWindows() {
     const toClose = tabIdsToClose.filter((id) => id !== newTab.id)
     // Remove in batches to stay within API limits
     for (let i = 0; i < toClose.length; i += 50) {
-      await chrome.tabs.remove(toClose.slice(i, i + 50)).catch(() => {})
+      await chrome.tabs.remove(toClose.slice(i, i + 50)).catch(() => { })
     }
   }, 300)
 }
@@ -109,16 +110,29 @@ chrome.action.onClicked.addListener(() => {
 })
 
 // Right-click context menu → open collection list without collecting
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({
     id: "open-collection",
     title: "查看收集记录",
     contexts: ["action"],
   })
+
+  chrome.contextMenus.create({
+    id: "open-guide",
+    title: "查看使用引导",
+    contexts: ["action"],
+  })
+
+  if (details.reason === "install") {
+    chrome.tabs.create({ url: GUIDE_URL(), active: true })
+  }
 })
 
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === "open-collection") {
     chrome.tabs.create({ url: COLLECTION_URL(), active: true })
+  }
+  if (info.menuItemId === "open-guide") {
+    chrome.tabs.create({ url: GUIDE_URL(), active: true })
   }
 })
