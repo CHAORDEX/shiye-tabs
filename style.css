@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design Tokens (light) ───────────────────────────────────── */
+:root {
+  --bg:        #FAFAF8;
+  --bg2:       #F2F1EC;
+  --bg3:       #ECEAE3;
+  --text:      #1A1A19;
+  --text2:     #5A5A57;
+  --text3:     #9A9A96;
+  --border:    #E2E1DB;
+  --border2:   #D0CFC9;
+  --accent:    #D97756;
+  --accent2:   #C4623E;
+  --accent-bg: rgba(217,119,86,0.08);
+  --card:      #FFFFFF;
+  --card-h:    #FDFCFB;
+  --shadow-s:  0 1px 3px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-m:  0 4px 12px rgba(0,0,0,.07), 0 1px 4px rgba(0,0,0,.04);
+  --shadow-l:  0 8px 32px rgba(0,0,0,.09), 0 2px 8px rgba(0,0,0,.05);
+  --r:         14px;
+  --r-s:       8px;
+  --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+               'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+  --mono:      'SF Mono', 'Fira Code', ui-monospace, monospace;
+  --dur:       220ms;
+  --ease:      cubic-bezier(.25,.46,.45,.94);
+}
+
+/* ── Dark tokens — explicit override ────────────────────────── */
+html[data-theme="dark"] {
+  --bg:        #0E0E0C;
+  --bg2:       #171714;
+  --bg3:       #212120;
+  --text:      #F0EFE9;
+  --text2:     #A0A09B;
+  --text3:     #606060;
+  --border:    #2A2A27;
+  --border2:   #353532;
+  --accent:    #E08060;
+  --accent2:   #C86840;
+  --accent-bg: rgba(217,119,86,0.12);
+  --card:      #171714;
+  --card-h:    #1E1E1B;
+  --shadow-s:  0 1px 3px rgba(0,0,0,.3);
+  --shadow-m:  0 4px 12px rgba(0,0,0,.4);
+  --shadow-l:  0 8px 32px rgba(0,0,0,.5);
+}
+
+/* ── Dark tokens — system preference (only when not manually set) */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --bg:        #0E0E0C;
+    --bg2:       #171714;
+    --bg3:       #212120;
+    --text:      #F0EFE9;
+    --text2:     #A0A09B;
+    --text3:     #606060;
+    --border:    #2A2A27;
+    --border2:   #353532;
+    --accent:    #E08060;
+    --accent2:   #C86840;
+    --accent-bg: rgba(217,119,86,0.12);
+    --card:      #171714;
+    --card-h:    #1E1E1B;
+    --shadow-s:  0 1px 3px rgba(0,0,0,.3);
+    --shadow-m:  0 4px 12px rgba(0,0,0,.4);
+    --shadow-l:  0 8px 32px rgba(0,0,0,.5);
+  }
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  line-height: 1.65;
+}
+
+/* ── Sticky nav — dark/light aware ──────────────────────────── */
+.kt-nav {
+  background: rgba(250, 250, 248, 0.92);
+}
+html[data-theme="dark"] .kt-nav {
+  background: rgba(14, 14, 12, 0.92);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .kt-nav {
+    background: rgba(14, 14, 12, 0.92);
+  }
+}
+
+/* ── Font picker panel ───────────────────────────────────────── */
+.kt-font-panel {
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+.kt-font-chip {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text2);
+  transition: all var(--dur) var(--ease);
+  white-space: nowrap;
+}
+.kt-font-chip:hover {
+  border-color: var(--border2);
+  color: var(--text);
+}
+.kt-font-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}

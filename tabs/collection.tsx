@@ -1,4 +1,8 @@
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
+import "../style.css"
+
+/* ── Types ──────────────────────────────────────────────────── */
+type Theme = "light" | "dark" | "auto"
 
 interface TabInfo {
   title: string
@@ -9,183 +13,527 @@ interface Collection {
   id: string
   timestamp: number
   tabs: TabInfo[]
+  windowLabel?: string
 }
 
+interface FontOption {
+  id: string
+  name: string
+  family: string
+  cssUrl?: string
+}
+
+/* ── Fonts ───────────────────────────────────────────────────── */
+const FONTS: FontOption[] = [
+  {
+    id: "system",
+    name: "系统默认",
+    family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif",
+  },
+  {
+    id: "noto",
+    name: "Noto Sans SC",
+    family: "'Noto Sans SC', sans-serif",
+    cssUrl: "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
+  },
+  {
+    id: "lxgw",
+    name: "霞鹜文楷",
+    family: "'LXGW WenKai', cursive",
+    cssUrl: "https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.6.0/style.css",
+  },
+  {
+    id: "source-han",
+    name: "思源黑体",
+    family: "'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif",
+    cssUrl: "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
+  },
+]
+
+const FONT_KEY = "shiye-font-id"
+const THEME_KEY = "shiye-theme"
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+function systemIsDark() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+
+function applyTheme(theme: Theme) {
+  const html = document.documentElement
+  if (theme === "dark") html.setAttribute("data-theme", "dark")
+  else if (theme === "light") html.setAttribute("data-theme", "light")
+  else html.removeAttribute("data-theme")
+}
+
+function loadFontCss(cssUrl: string) {
+  const id = `kt-font-${btoa(cssUrl).slice(0, 12)}`
+  if (document.getElementById(id)) return
+  const link = document.createElement("link")
+  link.id = id; link.rel = "stylesheet"; link.href = cssUrl
+  document.head.appendChild(link)
+}
+
+function applyFont(opt: FontOption) {
+  if (opt.cssUrl) loadFontCss(opt.cssUrl)
+  document.documentElement.style.setProperty("--font", opt.family)
+  document.body.style.fontFamily = opt.family
+}
+
+function getFavicon(url: string) {
+  try {
+    return `https://www.google.com/s2/favicons?sz=32&domain=${new URL(url).hostname}`
+  } catch { return null }
+}
+
+function formatDate(ts: number) {
+  const d = new Date(ts)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  if (isToday) return "今天 " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+  return d.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+}
+
+/* ── Small icon button ───────────────────────────────────────── */
+function IconBtn({
+  children, onClick, title, accent,
+}: {
+  children: React.ReactNode
+  onClick: (e: React.MouseEvent) => void
+  title?: string
+  accent?: boolean
+}) {
+  const [h, setH] = useState(false)
+  return (
+    <button
+      title={title}
+      onClick={(e) => { e.stopPropagation(); onClick(e) }}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        width: 22, height: 22, padding: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        border: "none", borderRadius: 5, cursor: "pointer",
+        fontSize: 11, fontWeight: 600, flexShrink: 0,
+        background: h ? (accent ? "var(--accent)" : "var(--bg3)") : "transparent",
+        color: h ? (accent ? "#fff" : "var(--text2)") : "var(--text3)",
+        transition: "all var(--dur) var(--ease)",
+        fontFamily: "var(--font)",
+      }}>
+      {children}
+    </button>
+  )
+}
+
+/* ── TabItem — compact grid cell ────────────────────────────── */
+function TabItem({
+  tab, onOpen, onDelete,
+}: { tab: TabInfo; onOpen: () => void; onDelete: () => void }) {
+  const [h, setH] = useState(false)
+  const favicon = getFavicon(tab.url)
+
+  return (
+    <div
+      title={tab.url}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "5px 8px",
+        borderRadius: 6,
+        background: h ? "var(--bg2)" : "transparent",
+        transition: "background var(--dur) var(--ease)",
+        cursor: "default", minWidth: 0,
+      }}>
+      {/* Favicon */}
+      <div style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {favicon ? (
+          <img src={favicon} alt="" style={{ width: 13, height: 13, borderRadius: 2, opacity: 0.72 }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
+        ) : (
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--border2)" }} />
+        )}
+      </div>
+
+      {/* Title */}
+      <span style={{
+        flex: 1, minWidth: 0,
+        fontSize: 12.5, fontWeight: 450, color: "var(--text)",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        lineHeight: 1.35,
+      }}>
+        {tab.title}
+      </span>
+
+      {/* Actions — visible on row hover */}
+      <div style={{
+        display: "flex", gap: 2, flexShrink: 0,
+        opacity: h ? 1 : 0,
+        transition: "opacity var(--dur) var(--ease)",
+      }}>
+        <IconBtn onClick={onOpen} title="打开标签" accent>↗</IconBtn>
+        <IconBtn onClick={onDelete} title="删除">×</IconBtn>
+      </div>
+    </div>
+  )
+}
+
+/* ── CollectionCard ──────────────────────────────────────────── */
+function CollectionCard({
+  collection, onOpenAll, onOpenTab, onDeleteTab, onDelete,
+}: {
+  collection: Collection
+  onOpenAll: () => void
+  onOpenTab: (url: string, index: number) => void
+  onDeleteTab: (index: number) => void
+  onDelete: () => void
+}) {
+  const [hCard, setHCard] = useState(false)
+
+  return (
+    <div
+      onMouseEnter={() => setHCard(true)}
+      onMouseLeave={() => setHCard(false)}
+      style={{
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--r)",
+        overflow: "hidden",
+        boxShadow: hCard ? "var(--shadow-m)" : "var(--shadow-s)",
+        transition: "box-shadow var(--dur) var(--ease)",
+      }}>
+
+      {/* ── Header ── */}
+      <div style={{
+        display: "flex", alignItems: "center",
+        padding: "9px 14px",
+        borderBottom: "1px solid var(--border)",
+        background: "var(--bg2)", gap: 8,
+      }}>
+        {/* Date */}
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>
+          {formatDate(collection.timestamp)}
+        </span>
+
+        {/* Window badge */}
+        {collection.windowLabel && (
+          <span style={{
+            fontSize: 10, fontWeight: 500, padding: "1px 6px",
+            background: "var(--accent-bg)", color: "var(--accent)",
+            borderRadius: 99, border: "1px solid rgba(217,119,86,.15)", flexShrink: 0,
+          }}>
+            {collection.windowLabel}
+          </span>
+        )}
+
+        {/* Count */}
+        <span style={{ fontSize: 11, color: "var(--text3)", flex: 1 }}>
+          {collection.tabs.length} 个标签页
+        </span>
+
+        {/* Actions */}
+        <button
+          onClick={onOpenAll}
+          style={{
+            padding: "4px 10px", background: "var(--accent)", color: "#fff",
+            border: "none", borderRadius: "var(--r-s)", fontSize: 11.5,
+            fontWeight: 500, cursor: "pointer", fontFamily: "var(--font)",
+            flexShrink: 0, transition: "background var(--dur) var(--ease)",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent2)" }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)" }}>
+          ↗ 全部恢复
+        </button>
+        <button
+          onClick={onDelete}
+          style={{
+            padding: "4px 10px", background: "transparent", color: "var(--text3)",
+            border: "1px solid var(--border)", borderRadius: "var(--r-s)",
+            fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font)",
+            flexShrink: 0, transition: "all var(--dur) var(--ease)",
+          }}
+          onMouseEnter={(e) => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = "var(--bg3)"; el.style.borderColor = "var(--border2)"; el.style.color = "var(--text2)"
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = "transparent"; el.style.borderColor = "var(--border)"; el.style.color = "var(--text3)"
+          }}>
+          删除
+        </button>
+      </div>
+
+      {/* ── Tab list ── */}
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        padding: "6px 6px",
+      }}>
+        {collection.tabs.map((tab, index) => (
+          <TabItem
+            key={`${tab.url}-${index}`}
+            tab={tab}
+            onOpen={() => onOpenTab(tab.url, index)}
+            onDelete={() => onDeleteTab(index)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Header icon button helper ───────────────────────────────── */
+function NavBtn({
+  children, onClick, title, active = false,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  title?: string
+  active?: boolean
+}) {
+  const [h, setH] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        width: 32, height: 32,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: active ? "var(--accent-bg)" : (h ? "var(--bg2)" : "transparent"),
+        color: active ? "var(--accent)" : (h ? "var(--text)" : "var(--text3)"),
+        border: `1px solid ${active ? "rgba(217,119,86,.2)" : (h ? "var(--border2)" : "var(--border)")}`,
+        borderRadius: "var(--r-s)", cursor: "pointer",
+        fontSize: 13, fontWeight: 600, fontFamily: "var(--font)",
+        transition: "all var(--dur) var(--ease)",
+      }}>
+      {children}
+    </button>
+  )
+}
+
+/* ── Main ────────────────────────────────────────────────────── */
 function CollectionPage() {
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
+  const [fontId, setFontId] = useState("system")
+  const [showFontPanel, setShowFontPanel] = useState(false)
+  const [theme, setTheme] = useState<Theme>("auto")
+  const navRef = useRef<HTMLDivElement>(null)
 
-  const loadCollections = async () => {
-    try {
-      const result = await chrome.storage.local.get("collections")
-      console.log("从 storage 获取的数据:", result)
+  const totalTabs = collections.reduce((n, c) => n + c.tabs.length, 0)
+  const isDark = theme === "dark" || (theme === "auto" && systemIsDark())
 
-      if (result.collections && Array.isArray(result.collections)) {
-        console.log("设置收集记录:", result.collections)
-        setCollections(result.collections)
-      } else {
-        console.log("没有找到收集记录")
-      }
-    } catch (e) {
-      console.error("加载数据失败", e)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  /* ── Boot ── */
   useEffect(() => {
-    loadCollections()
+    chrome.storage.local.get(["collections", FONT_KEY, THEME_KEY]).then((r) => {
+      if (r.collections && Array.isArray(r.collections)) setCollections(r.collections)
+      if (r[FONT_KEY]) {
+        const opt = FONTS.find((f) => f.id === r[FONT_KEY]) ?? FONTS[0]
+        setFontId(opt.id); applyFont(opt)
+      }
+      if (r[THEME_KEY]) {
+        const t = r[THEME_KEY] as Theme
+        setTheme(t); applyTheme(t)
+      }
+      setLoading(false)
+    })
   }, [])
 
-  const openAllTabs = async (collectionId: string) => {
-    const collection = collections.find((c) => c.id === collectionId)
-    if (!collection) return
+  /* ── Close font panel on outside click ── */
+  useEffect(() => {
+    if (!showFontPanel) return
+    const h = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setShowFontPanel(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [showFontPanel])
 
-    collection.tabs.forEach((tab) => {
-      chrome.tabs.create({ url: tab.url, active: false })
-    })
-
-    // 打开后删除该收集记录
-    await deleteCollection(collectionId)
+  /* ── Persist ── */
+  const persist = async (updated: Collection[]) => {
+    setCollections(updated)
+    await chrome.storage.local.set({ collections: updated })
   }
 
-  const openSingleTab = (url: string) => {
+  const toggleTheme = async () => {
+    const next: Theme = isDark ? "light" : "dark"
+    setTheme(next); applyTheme(next)
+    await chrome.storage.local.set({ [THEME_KEY]: next })
+  }
+
+  const selectFont = async (opt: FontOption) => {
+    setFontId(opt.id); applyFont(opt)
+    await chrome.storage.local.set({ [FONT_KEY]: opt.id })
+  }
+
+  /* ── Tab ops ── */
+  const openAllTabs = async (id: string) => {
+    const col = collections.find((c) => c.id === id)
+    if (!col) return
+    for (const tab of col.tabs) {
+      try { await chrome.tabs.create({ url: tab.url, active: false }) } catch {}
+    }
+    await persist(collections.filter((c) => c.id !== id))
+  }
+
+  const openSingleTab = async (colId: string, url: string, idx: number) => {
     chrome.tabs.create({ url, active: false })
+    await persist(
+      collections
+        .map((c) => c.id !== colId ? c : { ...c, tabs: c.tabs.filter((_, i) => i !== idx) })
+        .filter((c) => c.tabs.length > 0)
+    )
   }
 
-  const deleteCollection = async (collectionId: string) => {
-    const updatedCollections = collections.filter((c) => c.id !== collectionId)
-    await chrome.storage.local.set({ collections: updatedCollections })
-    setCollections(updatedCollections)
+  const deleteTab = async (colId: string, idx: number) => {
+    await persist(
+      collections
+        .map((c) => c.id !== colId ? c : { ...c, tabs: c.tabs.filter((_, i) => i !== idx) })
+        .filter((c) => c.tabs.length > 0)
+    )
   }
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleString("zh-CN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    })
+  const deleteCollection = async (id: string) => persist(collections.filter((c) => c.id !== id))
+
+  const clearAll = async () => {
+    if (!confirm(`确定要删除全部 ${collections.length} 条收集记录吗？`)) return
+    await persist([])
   }
 
+  /* ── Render ── */
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-      <h1 style={{ margin: "0 0 24px 0" }}>收集的标签页</h1>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
 
-      {loading ? (
-        <p style={{ color: "#999", textAlign: "center", marginTop: 64 }}>
-          加载中...
-        </p>
-      ) : collections.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {collections.map((collection) => (
-            <div
-              key={collection.id}
-              style={{
-                border: "2px solid #ddd",
-                borderRadius: 12,
-                padding: 20,
-                backgroundColor: "white"
-              }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #eee"
-                }}>
-                <div>
-                  <h2 style={{ margin: "0 0 4px 0", fontSize: 18 }}>
-                    收集时间: {formatDate(collection.timestamp)}
-                  </h2>
-                  <p style={{ margin: 0, color: "#666", fontSize: 14 }}>
-                    共 {collection.tabs.length} 个标签页
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => openAllTabs(collection.id)}
-                    style={{
-                      padding: "10px 20px",
-                      backgroundColor: "#4CAF50",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 14,
-                      fontWeight: 500
-                    }}>
-                    打开全部
-                  </button>
-                  <button
-                    onClick={() => deleteCollection(collection.id)}
-                    style={{
-                      padding: "10px 20px",
-                      backgroundColor: "#f44336",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 14,
-                      fontWeight: 500
-                    }}>
-                    删除
-                  </button>
-                </div>
+      {/* ── Nav ── */}
+      <div
+        ref={navRef}
+        className="kt-nav"
+        style={{
+          position: "sticky", top: 0, zIndex: 100,
+          backdropFilter: "blur(16px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+          borderBottom: "1px solid var(--border)",
+        }}>
+
+        <div style={{
+          maxWidth: 1100, margin: "0 auto",
+          height: 56, padding: "0 24px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 30, height: 30, background: "var(--accent-bg)", borderRadius: 8,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0,
+              border: "1px solid rgba(217,119,86,.15)",
+            }}>📑</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em", color: "var(--text)", lineHeight: 1.2 }}>
+                拾页 Shiye
               </div>
-
-              <div style={{ display: "grid", gap: 8 }}>
-                {collection.tabs.map((tab, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      padding: 12,
-                      border: "1px solid #e0e0e0",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      backgroundColor: "#fafafa"
-                    }}
-                    onClick={() => openSingleTab(tab.url)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f0f0f0"
-                      e.currentTarget.style.borderColor = "#2196F3"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fafafa"
-                      e.currentTarget.style.borderColor = "#e0e0e0"
-                    }}>
-                    <div
-                      style={{
-                        fontWeight: 500,
-                        marginBottom: 4,
-                        fontSize: 14
-                      }}>
-                      {tab.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#666",
-                        wordBreak: "break-all"
-                      }}>
-                      {tab.url}
-                    </div>
-                  </div>
-                ))}
+              <div style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 1 }}>
+                {loading ? "加载中…" : `${collections.length} 个记录 · ${totalTabs} 个标签页`}
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* Right controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <NavBtn onClick={toggleTheme} title={isDark ? "切换亮色" : "切换深色"}>
+              {isDark ? "☀" : "🌙"}
+            </NavBtn>
+            <NavBtn onClick={() => setShowFontPanel((v) => !v)} title="字体" active={showFontPanel}>
+              Aa
+            </NavBtn>
+            {!loading && collections.length > 0 && (
+              <button
+                onClick={clearAll}
+                style={{
+                  padding: "5px 11px", background: "transparent", color: "var(--text3)",
+                  border: "1px solid var(--border)", borderRadius: "var(--r-s)",
+                  fontSize: 12, cursor: "pointer", fontFamily: "var(--font)",
+                  transition: "all var(--dur) var(--ease)",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement
+                  el.style.color = "var(--text)"; el.style.borderColor = "var(--border2)"; el.style.background = "var(--bg2)"
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement
+                  el.style.color = "var(--text3)"; el.style.borderColor = "var(--border)"; el.style.background = "transparent"
+                }}>
+                清空全部
+              </button>
+            )}
+          </div>
         </div>
-      ) : (
-        <p style={{ color: "#999", textAlign: "center", marginTop: 64 }}>
-          还没有收集记录
-        </p>
-      )}
+
+        {/* Font panel */}
+        {showFontPanel && (
+          <div className="kt-font-panel">
+            <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}>字体</span>
+            {FONTS.map((opt) => (
+              <button
+                key={opt.id}
+                className={`kt-font-chip${fontId === opt.id ? " active" : ""}`}
+                style={{ fontFamily: opt.family }}
+                onClick={() => selectFont(opt)}>
+                {opt.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 24px 60px" }}>
+
+        {loading && (
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%",
+              border: "2px solid var(--border2)", borderTopColor: "var(--accent)",
+              animation: "spin .8s linear infinite",
+            }} />
+          </div>
+        )}
+
+        {!loading && collections.length === 0 && (
+          <div style={{ textAlign: "center", paddingTop: 100 }}>
+            <div style={{ fontSize: 44, marginBottom: 14, opacity: 0.35 }}>🗂</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)", marginBottom: 5 }}>
+              还没有收集记录
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.6 }}>
+              点击扩展图标，一键收集并关闭当前所有标签页
+            </div>
+          </div>
+        )}
+
+        {!loading && collections.length > 0 && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+            gap: 12,
+            alignItems: "start",
+          }}>
+            {collections.map((col) => (
+              <CollectionCard
+                key={col.id}
+                collection={col}
+                onOpenAll={() => openAllTabs(col.id)}
+                onOpenTab={(url, idx) => openSingleTab(col.id, url, idx)}
+                onDeleteTab={(idx) => deleteTab(col.id, idx)}
+                onDelete={() => deleteCollection(col.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
