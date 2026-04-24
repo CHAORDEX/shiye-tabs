@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import "remixicon/fonts/remixicon.css"
 import "../style.css"
 
 interface Collection {
@@ -41,8 +42,9 @@ function GuidePage() {
               alignItems: "center",
               justifyContent: "center",
               fontSize: 20,
+              color: "var(--accent)",
             }}>
-            📑
+            <i className="ri-bookmark-3-line"></i>
           </div>
           <div>
             <div style={{ fontSize: 24, fontWeight: 650, letterSpacing: "-.01em" }}>欢迎使用 拾页 Shiye</div>
