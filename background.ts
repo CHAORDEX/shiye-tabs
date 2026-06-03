@@ -1,4 +1,11 @@
+import { ensureFontRefererRule } from "./font-referer"
+
 export { }
+
+// 给字体 CDN 请求补 Referer（详见 font-referer.ts）。动态规则可持久化，
+// 但在 SW 唤醒 / 安装 / 浏览器启动时都确保一次，简单且幂等。
+void ensureFontRefererRule()
+chrome.runtime.onStartup.addListener(() => void ensureFontRefererRule())
 
 interface TabInfo {
   title: string
@@ -111,6 +118,8 @@ chrome.action.onClicked.addListener(() => {
 
 // Right-click context menu → open collection list without collecting
 chrome.runtime.onInstalled.addListener((details) => {
+  void ensureFontRefererRule()
+
   chrome.contextMenus.create({
     id: "open-collection",
     title: "查看收集记录",

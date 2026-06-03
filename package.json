@@ -1,7 +1,7 @@
 {
   "name": "shiye-tabs",
   "displayName": "拾页 Shiye",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A graceful tab collector for one-click capture and restore",
   "author": "z",
   "scripts": {
@@ -34,10 +34,11 @@
       "tabs",
       "storage",
       "contextMenus",
-      "windows"
+      "windows",
+      "declarativeNetRequest"
     ],
     "content_security_policy": {
-      "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net"
+      "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'self' https:"
     }
   }
 }

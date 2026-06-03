@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import "remixicon/fonts/remixicon.css"
 import "../style.css"
+import { WEB_FONTS } from "./fonts"
 
 /* ── Types ──────────────────────────────────────────────────── */
 type Theme = "light" | "dark" | "auto"
@@ -17,42 +18,47 @@ interface Collection {
   windowLabel?: string
 }
 
-interface FontOption {
+interface SelectableFont {
   id: string
   name: string
   family: string
-  cssUrl?: string
+  /** 远程 CSS 索引地址（中文网字计划 CDN），系统字体为空 */
+  cssUrls?: string[]
 }
 
 /* ── Fonts ───────────────────────────────────────────────────── */
-const FONTS: FontOption[] = [
-  {
-    id: "system",
-    name: "系统默认",
-    family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif",
-  },
-  {
-    id: "noto",
-    name: "Noto Sans SC",
-    family: "'Noto Sans SC', sans-serif",
-    cssUrl: "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
-  },
-  {
-    id: "lxgw",
-    name: "霞鹜文楷",
-    family: "'LXGW WenKai', cursive",
-    cssUrl: "https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.6.0/style.css",
-  },
-  {
-    id: "source-han",
-    name: "思源黑体",
-    family: "'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif",
-    cssUrl: "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
-  },
+const SYSTEM_FAMILY =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif"
+
+const SYSTEM_FONT: SelectableFont = {
+  id: "system",
+  name: "系统默认",
+  family: SYSTEM_FAMILY,
+}
+
+// 系统默认 + 中文网字计划 80 款免费 web 字体
+const ALL_FONTS: SelectableFont[] = [
+  SYSTEM_FONT,
+  ...WEB_FONTS.map((f) => ({ id: f.id, name: f.name, family: f.family, cssUrls: f.cssUrls })),
 ]
 
 const FONT_KEY = "shiye-font-id"
 const THEME_KEY = "shiye-theme"
+const FONT_SCALE_KEY = "shiye-font-scale"
+
+/* 内容字号缩放系数范围 */
+const SCALE_MIN = 0.8
+const SCALE_MAX = 1.6
+const SCALE_STEP = 0.1
+const SCALE_DEFAULT = 1
+
+/** 可缩放的内容字号：基准 px × 用户缩放系数 */
+const fs = (px: number) => `calc(${px}px * var(--fs))`
+
+function clampScale(v: number): number {
+  if (!Number.isFinite(v)) return SCALE_DEFAULT
+  return Math.min(SCALE_MAX, Math.max(SCALE_MIN, Math.round(v * 10) / 10))
+}
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function systemIsDark() {
@@ -66,18 +72,45 @@ function applyTheme(theme: Theme) {
   else html.removeAttribute("data-theme")
 }
 
-function loadFontCss(cssUrl: string) {
-  const id = `kt-font-${btoa(cssUrl).slice(0, 12)}`
-  if (document.getElementById(id)) return
+function applyFontScale(scale: number) {
+  document.documentElement.style.setProperty("--fs", String(clampScale(scale)))
+}
+
+// 已加载/加载中的字体 CSS，跨预览与应用去重，避免重复请求
+const loadedFontCss = new Set<string>()
+
+/**
+ * 加载中文网字计划字体的 CSS 索引并注入页面。
+ *
+ * 遵守服务商规定：该网关明确要求「通过 link 标签或 css 文件加载」，并校验
+ * Sec-Fetch-Dest——fetch 的 `empty` 一律 403（响应体提示「此 URL 不支持直接打开」），
+ * 唯有 <link rel="stylesheet"> 的 `style` 被放行。该 header 受浏览器保护、无法伪造，
+ * 故直接交由浏览器以样式表资源加载，CSS 内相对 woff2 也由浏览器按最终 URL 自动解析。
+ */
+function injectFontCss(cssUrl: string): void {
+  const href = encodeURI(cssUrl)
+  if (loadedFontCss.has(href)) return
+  loadedFontCss.add(href)
   const link = document.createElement("link")
-  link.id = id; link.rel = "stylesheet"; link.href = cssUrl
+  link.rel = "stylesheet"
+  link.dataset.font = href
+  link.href = href
+  link.onerror = () => {
+    link.remove()
+    loadedFontCss.delete(href) // 失败则允许后续重试
+    console.warn("[拾页] 字体加载失败：", cssUrl)
+  }
   document.head.appendChild(link)
 }
 
-function applyFont(opt: FontOption) {
-  if (opt.cssUrl) loadFontCss(opt.cssUrl)
-  document.documentElement.style.setProperty("--font", opt.family)
-  document.body.style.fontFamily = opt.family
+/** Web 字体追加系统字体兜底：未覆盖的字符回退系统字体，避免豆腐块或"看似无变化" */
+function fontFamilyValue(font: SelectableFont): string {
+  return font.cssUrls ? `${font.family}, ${SYSTEM_FAMILY}` : font.family
+}
+
+function applyFont(font: SelectableFont) {
+  font.cssUrls?.forEach((u) => injectFontCss(u))
+  document.documentElement.style.setProperty("--font", fontFamilyValue(font))
 }
 
 function getFavicon(url: string) {
@@ -138,29 +171,29 @@ function TabItem({
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
       style={{
-        display: "flex", alignItems: "center", gap: 6,
-        padding: "5px 8px",
-        borderRadius: 6,
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "7px 10px",
+        borderRadius: 7,
         background: h ? "var(--bg2)" : "transparent",
         transition: "background var(--dur) var(--ease)",
         cursor: "default", minWidth: 0,
       }}>
       {/* Favicon */}
-      <div style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 16, height: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {favicon ? (
-          <img src={favicon} alt="" style={{ width: 13, height: 13, borderRadius: 2, opacity: 0.72 }}
+          <img src={favicon} alt="" style={{ width: 15, height: 15, borderRadius: 3, opacity: 0.82 }}
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
         ) : (
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--border2)" }} />
+          <div style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--border2)" }} />
         )}
       </div>
 
       {/* Title */}
       <span style={{
         flex: 1, minWidth: 0,
-        fontSize: 12.5, fontWeight: 450, color: "var(--text)",
+        fontSize: fs(14), fontWeight: 500, color: "var(--text)",
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        lineHeight: 1.35,
+        lineHeight: 1.4,
       }}>
         {tab.title}
       </span>
@@ -221,21 +254,21 @@ function CollectionCard({
       {/* ── Header ── */}
       <div style={{
         display: "flex", alignItems: "center",
-        padding: "9px 14px",
+        padding: "12px 16px",
         borderBottom: "1px solid var(--border)",
         background: "var(--bg2)", gap: 8,
         borderTopLeftRadius: "calc(var(--r) - 1px)",
         borderTopRightRadius: "calc(var(--r) - 1px)",
       }}>
         {/* Date */}
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>
+        <span style={{ fontSize: fs(14.5), fontWeight: 700, color: "var(--text)", flexShrink: 0, letterSpacing: "-.01em" }}>
           {formatDate(collection.timestamp)}
         </span>
 
         {/* Window badge */}
         {collection.windowLabel && (
           <span style={{
-            fontSize: 10, fontWeight: 500, padding: "1px 6px",
+            fontSize: fs(11), fontWeight: 600, padding: "2px 7px",
             background: "var(--accent-bg)", color: "var(--accent)",
             borderRadius: 99, border: "1px solid rgba(217,119,86,.15)", flexShrink: 0,
           }}>
@@ -244,7 +277,7 @@ function CollectionCard({
         )}
 
         {/* Count */}
-        <span style={{ fontSize: 11, color: "var(--text3)", flex: 1 }}>
+        <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--text3)", flex: 1 }}>
           {collection.tabs.length} 个标签页
         </span>
 
@@ -322,11 +355,11 @@ function CollectionCard({
         <button
           onClick={onOpenAll}
           style={{
-            padding: "4px 10px", background: "var(--accent)", color: "#fff",
-            border: "none", borderRadius: "var(--r-s)", fontSize: 11.5,
-            fontWeight: 500, cursor: "pointer", fontFamily: "var(--font)",
+            padding: "6px 12px", background: "var(--accent)", color: "#fff",
+            border: "none", borderRadius: "var(--r-s)", fontSize: fs(12.5),
+            fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)",
             flexShrink: 0, transition: "background var(--dur) var(--ease)",
-            display: "flex", alignItems: "center", gap: 4
+            display: "flex", alignItems: "center", gap: 5
           }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent2)" }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)" }}>
@@ -335,11 +368,11 @@ function CollectionCard({
         <button
           onClick={onDelete}
           style={{
-            padding: "4px 10px", background: "transparent", color: "var(--text3)",
+            padding: "6px 12px", background: "transparent", color: "var(--text3)",
             border: "1px solid var(--border)", borderRadius: "var(--r-s)",
-            fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font)",
+            fontSize: fs(12.5), fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)",
             flexShrink: 0, transition: "all var(--dur) var(--ease)",
-            display: "flex", alignItems: "center", gap: 4
+            display: "flex", alignItems: "center", gap: 5
           }}
           onMouseEnter={(e) => {
             const el = e.currentTarget as HTMLButtonElement
@@ -357,7 +390,7 @@ function CollectionCard({
       <div style={{
         display: "flex",
         flexDirection: "column",
-        padding: "6px 6px",
+        padding: "8px 8px",
       }}>
         {collection.tabs.map((tab, index) => (
           <TabItem
@@ -403,11 +436,143 @@ function NavBtn({
   )
 }
 
+/* ── Font size stepper ───────────────────────────────────────── */
+function FontSizeStepper({
+  scale, onChange,
+}: { scale: number; onChange: (next: number) => void }) {
+  const pct = Math.round(scale * 100)
+  return (
+    <div className="kt-size-row">
+      <span className="kt-font-label">字号</span>
+      <div className="kt-size-bar">
+        <button
+          className="kt-size-btn"
+          disabled={scale <= SCALE_MIN}
+          onClick={() => onChange(scale - SCALE_STEP)}
+          title="减小字号">−</button>
+        <span className="kt-size-val">{pct}%</span>
+        <button
+          className="kt-size-btn"
+          disabled={scale >= SCALE_MAX}
+          onClick={() => onChange(scale + SCALE_STEP)}
+          title="增大字号">+</button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Font row — lazy-loads its own preview when scrolled into view ── */
+function FontRow({
+  font, active, scrollRoot, onSelect,
+}: {
+  font: SelectableFont
+  active: boolean
+  scrollRoot: Element | null
+  onSelect: () => void
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [previewable, setPreviewable] = useState(!font.cssUrls)
+
+  useEffect(() => {
+    if (previewable || !ref.current) return
+    const el = ref.current
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            font.cssUrls?.forEach((u) => injectFontCss(u))
+            setPreviewable(true)
+            io.disconnect()
+            break
+          }
+        }
+      },
+      { root: scrollRoot, rootMargin: "200px" }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [font, previewable, scrollRoot])
+
+  return (
+    <button
+      ref={ref}
+      className={`kt-font-chip${active ? " active" : ""}`}
+      style={previewable ? { fontFamily: fontFamilyValue(font) } : undefined}
+      onClick={onSelect}
+      title={font.name}>
+      {font.name}
+    </button>
+  )
+}
+
+/* ── Font picker — search + size + lazy preview grid ─────────── */
+function FontPicker({
+  activeId, scale, onSelectFont, onScaleChange,
+}: {
+  activeId: string
+  scale: number
+  onSelectFont: (font: SelectableFont) => void
+  onScaleChange: (next: number) => void
+}) {
+  const [query, setQuery] = useState("")
+  // 回调 ref 转 state：附加后触发重渲染，让子项拿到真实的滚动容器作为观察根
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null)
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? ALL_FONTS.filter(
+        (f) => f.name.toLowerCase().includes(q) || f.family.toLowerCase().includes(q)
+      )
+    : ALL_FONTS
+
+  return (
+    <div className="kt-font-panel">
+      <FontSizeStepper scale={scale} onChange={onScaleChange} />
+
+      <input
+        className="kt-font-search"
+        placeholder={`搜索字体（共 ${ALL_FONTS.length} 款）`}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        autoFocus
+      />
+
+      <div className="kt-font-list" ref={setListEl}>
+        {filtered.length === 0 ? (
+          <div className="kt-font-empty">没有匹配的字体</div>
+        ) : (
+          filtered.map((f) => (
+            <FontRow
+              key={f.id}
+              font={f}
+              active={f.id === activeId}
+              scrollRoot={listEl}
+              onSelect={() => onSelectFont(f)}
+            />
+          ))
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "center", lineHeight: 1.5 }}>
+        字体由{" "}
+        <a
+          href="https://chinese-font.netlify.app"
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "var(--accent)", textDecoration: "none" }}>
+          中文网字计划
+        </a>{" "}
+        免费提供
+      </div>
+    </div>
+  )
+}
+
 /* ── Main ────────────────────────────────────────────────────── */
 function CollectionPage() {
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [fontId, setFontId] = useState("system")
+  const [fontScale, setFontScale] = useState(SCALE_DEFAULT)
   const [showFontPanel, setShowFontPanel] = useState(false)
   const [theme, setTheme] = useState<Theme>("auto")
   const navRef = useRef<HTMLDivElement>(null)
@@ -417,11 +582,15 @@ function CollectionPage() {
 
   /* ── Boot ── */
   useEffect(() => {
-    chrome.storage.local.get(["collections", FONT_KEY, THEME_KEY]).then((r) => {
+    chrome.storage.local.get(["collections", FONT_KEY, THEME_KEY, FONT_SCALE_KEY]).then((r) => {
       if (r.collections && Array.isArray(r.collections)) setCollections(r.collections)
       if (r[FONT_KEY]) {
-        const opt = FONTS.find((f) => f.id === r[FONT_KEY]) ?? FONTS[0]
+        const opt = ALL_FONTS.find((f) => f.id === r[FONT_KEY]) ?? SYSTEM_FONT
         setFontId(opt.id); applyFont(opt)
+      }
+      if (typeof r[FONT_SCALE_KEY] === "number") {
+        const v = clampScale(r[FONT_SCALE_KEY])
+        setFontScale(v); applyFontScale(v)
       }
       if (r[THEME_KEY]) {
         const t = r[THEME_KEY] as Theme
@@ -453,9 +622,15 @@ function CollectionPage() {
     await chrome.storage.local.set({ [THEME_KEY]: next })
   }
 
-  const selectFont = async (opt: FontOption) => {
+  const selectFont = async (opt: SelectableFont) => {
     setFontId(opt.id); applyFont(opt)
     await chrome.storage.local.set({ [FONT_KEY]: opt.id })
+  }
+
+  const changeFontScale = async (next: number) => {
+    const v = clampScale(next)
+    setFontScale(v); applyFontScale(v)
+    await chrome.storage.local.set({ [FONT_SCALE_KEY]: v })
   }
 
   /* ── Tab ops ── */
@@ -545,17 +720,12 @@ function CollectionPage() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 30, height: 30, background: "var(--accent-bg)", borderRadius: 8,
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
-              border: "1px solid rgba(217,119,86,.15)", color: "var(--accent)"
-            }}><i className="ri-bookmark-3-line"></i></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em", color: "var(--text)", lineHeight: 1.2 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-.02em", color: "var(--text)", lineHeight: 1.15 }}>
                 拾页 Shiye
               </div>
-              <div style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 1 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 500, color: "var(--text3)", marginTop: 1 }}>
                 {loading ? "加载中…" : `${collections.length} 个记录 · ${totalTabs} 个标签页`}
               </div>
             </div>
@@ -579,18 +749,12 @@ function CollectionPage() {
 
         {/* Font panel */}
         {showFontPanel && (
-          <div className="kt-font-panel">
-            <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}>字体</span>
-            {FONTS.map((opt) => (
-              <button
-                key={opt.id}
-                className={`kt-font-chip${fontId === opt.id ? " active" : ""}`}
-                style={{ fontFamily: opt.family }}
-                onClick={() => selectFont(opt)}>
-                {opt.name}
-              </button>
-            ))}
-          </div>
+          <FontPicker
+            activeId={fontId}
+            scale={fontScale}
+            onSelectFont={selectFont}
+            onScaleChange={changeFontScale}
+          />
         )}
       </div>
 
@@ -609,13 +773,13 @@ function CollectionPage() {
 
         {!loading && collections.length === 0 && (
           <div style={{ textAlign: "center", paddingTop: 100 }}>
-            <div style={{ fontSize: 44, marginBottom: 14, color: "var(--border2)" }}>
+            <div style={{ fontSize: 52, marginBottom: 16, color: "var(--border2)" }}>
               <i className="ri-folder-open-line"></i>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)", marginBottom: 5 }}>
+            <div style={{ fontSize: fs(17), fontWeight: 600, color: "var(--text2)", marginBottom: 6 }}>
               还没有收集记录
             </div>
-            <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.6 }}>
+            <div style={{ fontSize: fs(13.5), fontWeight: 500, color: "var(--text3)", lineHeight: 1.6 }}>
               点击扩展图标，一键收集并关闭当前所有标签页
             </div>
           </div>
