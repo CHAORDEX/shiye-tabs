@@ -111,9 +111,70 @@ async function collectAllWindows() {
   }, 300)
 }
 
-// Click icon → collect immediately (no popup)
-chrome.action.onClicked.addListener(() => {
-  collectAllWindows().catch(console.error)
+async function collectCurrentWindow() {
+  const collectionUrl = COLLECTION_URL()
+
+  // Load existing collections for URL dedup
+  const result = await chrome.storage.local.get("collections")
+  const existing: Collection[] = result.collections || []
+  const savedUrls = new Set(existing.flatMap((c) => c.tabs.map((t) => t.url)))
+
+  // Get current (focused) window
+  const currentWindow = await chrome.windows.getCurrent({ populate: true })
+  if (!currentWindow.id || !currentWindow.tabs) return
+
+  const now = Date.now()
+  const validTabs = currentWindow.tabs
+    .filter((tab) => {
+      if (!tab.url || !isCollectable(tab.url)) return false
+      if (savedUrls.has(tab.url)) return false
+      return true
+    })
+    .map((tab) => {
+      savedUrls.add(tab.url!)
+      return { title: tab.title || "无标题", url: tab.url! }
+    })
+
+  if (validTabs.length > 0) {
+    const newCollection: Collection = {
+      id: `${now}-w1`,
+      timestamp: now,
+      tabs: validTabs,
+      windowLabel: "当前窗口",
+    }
+    await chrome.storage.local.set({
+      collections: [newCollection, ...existing],
+    })
+  }
+
+  // Open collection page in the same window
+  const newTab = await chrome.tabs.create({ url: collectionUrl, active: true })
+
+  // Close other tabs in this window only
+  const tabIdsToClose = currentWindow.tabs
+    .filter((tab) => tab.id !== undefined && tab.id !== newTab.id)
+    .map((tab) => tab.id!)
+
+  setTimeout(async () => {
+    for (let i = 0; i < tabIdsToClose.length; i += 50) {
+      await chrome.tabs.remove(tabIdsToClose.slice(i, i + 50)).catch(() => {})
+    }
+  }, 300)
+}
+
+// Click icon → collect based on mode setting
+chrome.action.onClicked.addListener(async () => {
+  try {
+    const result = await chrome.storage.local.get("shiye-collect-mode")
+    const mode = result["shiye-collect-mode"] || "all"
+    if (mode === "current") {
+      await collectCurrentWindow()
+    } else {
+      await collectAllWindows()
+    }
+  } catch (err) {
+    console.error(err)
+  }
 })
 
 // Right-click context menu → open collection list without collecting

@@ -28,6 +28,8 @@
   --dur:       220ms;
   --ease:      cubic-bezier(.25,.46,.45,.94);
   --fs:        1;        /* 内容字号缩放系数，由字号控件调整 */
+  --fw:        500;      /* 内容字体粗细，由粗细控件调整 */
+  --fw-strong: 700;
 }
 
 /* ── Dark tokens — explicit override ────────────────────────── */
@@ -173,6 +175,25 @@ html[data-theme="dark"] .kt-nav {
   color: var(--text3);
   font-weight: 700;
 }
+.kt-weight-btn {
+  flex: 1;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+}
+.kt-weight-btn:hover { background: var(--bg3); color: var(--text); }
+.kt-weight-btn.active {
+  background: var(--card);
+  color: var(--accent);
+  box-shadow: var(--shadow-s);
+}
 
 /* Search box */
 .kt-font-search {
@@ -236,4 +257,55 @@ html[data-theme="dark"] .kt-nav {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.kt-card-split-born {
+  overflow: hidden;
+  animation: kt-split-born 680ms var(--ease) both;
+}
+.kt-card-split-born::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent calc(50% - 1px),
+      var(--accent) 50%,
+      transparent calc(50% + 1px)
+    );
+  opacity: 0;
+  animation: kt-split-line 680ms var(--ease) both;
+}
+
+@keyframes kt-split-born {
+  0% {
+    opacity: 0;
+    transform: scaleX(.92) translateY(-8px);
+  }
+  55% {
+    opacity: 1;
+    transform: scaleX(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1) translateY(0);
+  }
+}
+
+@keyframes kt-split-line {
+  0% { opacity: 0; transform: scaleY(.2); }
+  28% { opacity: .28; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+
+/* ── Masonry (waterfall) layout ─────────────────────────────── */
+.masonry-grid {
+  columns: 360px;
+  column-gap: 12px;
+}
+.masonry-grid > * {
+  break-inside: avoid;
+  margin-bottom: 12px;
 }
