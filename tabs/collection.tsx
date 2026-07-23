@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from "react"
 
+import {
+  GrainGradient,
+  MeshGradient,
+  NeuroNoise,
+  Waves
+} from "@paper-design/shaders-react"
+
 import "remixicon/fonts/remixicon.css"
+import "../contents/link-hints"
 import "../style.css"
 
 import { estimateTabTarget, playTabBeam, type Point } from "./beam"
 import { WEB_FONTS } from "./fonts"
+import { playScrollGear, playSound } from "./sounds"
 
 /* ── Types ──────────────────────────────────────────────────── */
 type Theme = "light" | "dark" | "auto"
 type DomainSortOrder = "asc" | "desc"
+type CardStyle = "classic" | "paper" | "glass" | "noir" | "aurora"
+type CardShader = "mesh" | "neuro" | "grain" | "waves"
 
 interface DraggedTab {
   colId: string
@@ -25,6 +36,15 @@ interface Collection {
   timestamp: number
   tabs: TabInfo[]
   windowLabel?: string
+  cardStyle?: CardStyle
+  backgroundImage?: string
+  cardShader?: CardShader
+}
+
+interface CardAppearanceUpdate {
+  cardStyle?: CardStyle
+  backgroundImage?: string
+  cardShader?: CardShader | null
 }
 
 interface SelectableFont {
@@ -61,14 +81,39 @@ const THEME_KEY = "shiye-theme"
 const FONT_SCALE_KEY = "shiye-font-scale"
 const FONT_WEIGHT_KEY = "shiye-font-weight"
 const BEAM_KEY = "shiye-beam-enabled"
+const SOUND_KEY = "shiye-sound-enabled"
 const COLLECT_MODE_KEY = "shiye-collect-mode"
 const WINDOW_COLUMNS_KEY = "shiye-window-columns"
 const COLLECTION_COLUMNS_KEY = "shiye-collection-columns"
 const TAB_DRAG_MIME = "application/x-shiye-tab"
 type CollectMode = "all" | "current"
 
+const CARD_STYLES: Array<{
+  id: CardStyle
+  name: string
+  description: string
+}> = [
+  { id: "classic", name: "清简", description: "干净克制" },
+  { id: "paper", name: "纸感", description: "温润自然" },
+  { id: "glass", name: "雾玻璃", description: "轻盈通透" },
+  { id: "noir", name: "夜幕", description: "深邃沉静" },
+  { id: "aurora", name: "流光", description: "柔和灵动" }
+]
+
+const CARD_SHADERS: Array<{
+  id: CardShader
+  name: string
+  description: string
+}> = [
+  { id: "mesh", name: "暮色织网", description: "柔和流动的网格渐变" },
+  { id: "neuro", name: "神经微光", description: "有机呼吸的噪声光影" },
+  { id: "grain", name: "颗粒潮汐", description: "带纸张颗粒的色彩潮汐" },
+  { id: "waves", name: "静谧波纹", description: "克制而有秩序的波浪" }
+]
+
 /** 打开标签时的光束动画默认开启 */
 const BEAM_DEFAULT = true
+const SOUND_DEFAULT = true
 
 /* 内容字号缩放系数范围 */
 const SCALE_MIN = 0.8
@@ -108,6 +153,152 @@ function clampWindowColumns(v: number): number {
 
 function clampCollectionColumns(v: number): number {
   return v === 2 ? 2 : COLLECTION_COLUMNS_DEFAULT
+}
+
+function normalizeBackgroundUrl(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : null
+  } catch {
+    return null
+  }
+}
+
+function backgroundImageValue(url: string): string {
+  const escaped = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+  return `linear-gradient(rgba(12, 14, 18, .28), rgba(12, 14, 18, .42)), url("${escaped}")`
+}
+
+function normalizeCardShader(value: unknown): CardShader | null {
+  return CARD_SHADERS.some((shader) => shader.id === value)
+    ? (value as CardShader)
+    : null
+}
+
+async function compressBackgroundImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("请选择图片文件")
+  if (file.size > 20 * 1024 * 1024) throw new Error("原图不能超过 20 MB")
+
+  const bitmap = await createImageBitmap(file)
+  const maxEdge = 1440
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext("2d")
+  if (!context) {
+    bitmap.close()
+    throw new Error("图片处理失败")
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+
+  const dataUrl = canvas.toDataURL("image/webp", 0.8)
+  if (dataUrl.length > 2.5 * 1024 * 1024)
+    throw new Error("压缩后图片仍然过大，请换一张图片")
+  return dataUrl
+}
+
+function CardShaderBackground({ shader }: { shader: CardShader }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [reduceMotion, setReduceMotion] = useState(() =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { rootMargin: "320px 0px" }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const onChange = () => setReduceMotion(media.matches)
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [])
+
+  const common = {
+    className: "kt-paper-shader-canvas",
+    width: "100%",
+    height: "100%",
+    minPixelRatio: 1,
+    maxPixelCount: 480000,
+    webGlContextAttributes: {
+      alpha: false,
+      antialias: false,
+      powerPreference: "low-power" as WebGLPowerPreference
+    }
+  }
+  const speed = reduceMotion ? 0 : 0.18
+
+  return (
+    <div
+      ref={containerRef}
+      className="kt-paper-shader"
+      data-shader={shader}>
+      {visible && shader === "mesh" && (
+        <MeshGradient
+          {...common}
+          colors={["#101827", "#275769", "#b86f55", "#e6b56d"]}
+          distortion={0.82}
+          swirl={0.42}
+          grainMixer={0.22}
+          grainOverlay={0.16}
+          speed={speed}
+        />
+      )}
+      {visible && shader === "neuro" && (
+        <NeuroNoise
+          {...common}
+          colorFront="#dce7ff"
+          colorMid="#776bb4"
+          colorBack="#111827"
+          brightness={0.08}
+          contrast={0.34}
+          scale={1.45}
+          speed={speed * 0.8}
+        />
+      )}
+      {visible && shader === "grain" && (
+        <GrainGradient
+          {...common}
+          colorBack="#142b2a"
+          colors={["#e8b86d", "#3d8b79", "#725f9e"]}
+          softness={0.68}
+          intensity={0.48}
+          noise={0.34}
+          shape="blob"
+          scale={0.9}
+          speed={speed * 0.7}
+        />
+      )}
+      {visible && shader === "waves" && (
+        <Waves
+          {...common}
+          colorFront="#ece5d4"
+          colorBack="#17343b"
+          shape={2.07}
+          frequency={0.44}
+          amplitude={0.57}
+          spacing={1.05}
+          proportion={0.75}
+          softness={0.12}
+          scale={0.52}
+        />
+      )}
+    </div>
+  )
 }
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -263,17 +454,20 @@ function IconBtn({
   children,
   onClick,
   title,
-  accent
+  accent,
+  hint
 }: {
   children: React.ReactNode
   onClick: (e: React.MouseEvent) => void
   title?: string
   accent?: boolean
+  hint?: boolean
 }) {
   const [h, setH] = useState(false)
   return (
     <button
       title={title}
+      data-shiye-link-hint={hint ? "" : undefined}
       onClick={(e) => {
         e.stopPropagation()
         onClick(e)
@@ -446,7 +640,7 @@ function TabItem({
           opacity: h ? 1 : 0,
           transition: "opacity var(--dur) var(--ease)"
         }}>
-        <IconBtn onClick={handleOpen} title="打开标签" accent>
+        <IconBtn onClick={handleOpen} title="打开标签" accent hint>
           <i className="ri-external-link-line"></i>
         </IconBtn>
         <IconBtn onClick={onDelete} title="删除">
@@ -476,7 +670,8 @@ function CollectionCard({
   onTabDragEnd,
   onTabDrop,
   onGather,
-  onMergeTo
+  onMergeTo,
+  onAppearanceChange
 }: {
   collection: Collection
   otherCollections: Collection[]
@@ -500,10 +695,21 @@ function CollectionCard({
   onTabDrop: (targetColId: string, targetIndex: number, e: React.DragEvent) => void
   onGather: () => void
   onMergeTo: (targetId: string) => void
+  onAppearanceChange: (appearance: CardAppearanceUpdate) => Promise<void>
 }) {
   const [hCard, setHCard] = useState(false)
   const [showMergeMenu, setShowMergeMenu] = useState(false)
+  const [showAppearancePanel, setShowAppearancePanel] = useState(false)
+  const [backgroundDraft, setBackgroundDraft] = useState(() =>
+    collection.backgroundImage?.startsWith("data:")
+      ? ""
+      : (collection.backgroundImage ?? "")
+  )
+  const [backgroundError, setBackgroundError] = useState(false)
+  const [uploadingBackground, setUploadingBackground] = useState(false)
+  const [uploadError, setUploadError] = useState("")
   const mergeMenuRef = useRef<HTMLDivElement>(null)
+  const appearanceRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showMergeMenu) return
@@ -518,29 +724,104 @@ function CollectionCard({
     return () => document.removeEventListener("mousedown", h)
   }, [showMergeMenu])
 
+  useEffect(() => {
+    setBackgroundDraft(
+      collection.backgroundImage?.startsWith("data:")
+        ? ""
+        : (collection.backgroundImage ?? "")
+    )
+  }, [collection.backgroundImage])
+
+  useEffect(() => {
+    if (!showAppearancePanel) return
+    const h = (e: MouseEvent) => {
+      if (
+        appearanceRef.current &&
+        !appearanceRef.current.contains(e.target as Node)
+      )
+        setShowAppearancePanel(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [showAppearancePanel])
+
+  const applyBackground = () => {
+    const normalized = normalizeBackgroundUrl(backgroundDraft)
+    if (normalized === null) {
+      setBackgroundError(true)
+      return
+    }
+    setBackgroundError(false)
+    setBackgroundDraft(normalized)
+    onAppearanceChange({ backgroundImage: normalized, cardShader: null })
+  }
+
+  const uploadBackground = async (file: File | undefined) => {
+    if (!file) return
+    setUploadingBackground(true)
+    setUploadError("")
+    setBackgroundError(false)
+    try {
+      const dataUrl = await compressBackgroundImage(file)
+      await onAppearanceChange({ backgroundImage: dataUrl, cardShader: null })
+      setBackgroundDraft("")
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "图片保存失败，请重试"
+      )
+    } finally {
+      setUploadingBackground(false)
+    }
+  }
+
+  const cardStyle = collection.cardStyle ?? "classic"
+  const hasCustomBackground = Boolean(collection.backgroundImage)
+  const cardShader = normalizeCardShader(collection.cardShader)
+  const appearanceMode = cardShader
+    ? "shader"
+    : hasCustomBackground
+      ? "image"
+      : "theme"
+
   return (
     <div
-      className={splitAnimating ? "kt-card-split-born" : undefined}
+      className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}`}
+      data-card-style={appearanceMode === "theme" ? cardStyle : undefined}
+      data-card-mode={appearanceMode}
       onMouseEnter={() => setHCard(true)}
       onMouseLeave={() => setHCard(false)}
       style={{
         position: "relative",
-        zIndex: showMergeMenu ? 100 : 1,
+        zIndex: showMergeMenu || showAppearancePanel ? 100 : 1,
         background: "var(--card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--r)",
         boxShadow: hCard ? "var(--shadow-m)" : "var(--shadow-s)",
-        transition: "box-shadow var(--dur) var(--ease)"
+        transition:
+          "box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease)",
+        transform: hCard ? "translateY(-1px)" : "translateY(0)"
       }}>
+      <div
+        className="kt-card-visual"
+        aria-hidden="true"
+        style={
+          appearanceMode === "image" && collection.backgroundImage
+            ? { backgroundImage: backgroundImageValue(collection.backgroundImage) }
+            : undefined
+        }>
+        {appearanceMode === "shader" && cardShader && (
+          <CardShaderBackground shader={cardShader} />
+        )}
+      </div>
       {/* ── Header ── */}
       <div
+        className="kt-card-header"
         style={{
           display: "flex",
           alignItems: "center",
           flexWrap: "wrap",
           padding: "12px 16px",
           borderBottom: "1px solid var(--border)",
-          background: "var(--bg2)",
           gap: 8,
           borderTopLeftRadius: "calc(var(--r) - 1px)",
           borderTopRightRadius: "calc(var(--r) - 1px)"
@@ -575,6 +856,140 @@ function CollectionCard({
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 4, marginRight: 4 }}>
+          <div style={{ position: "relative" }} ref={appearanceRef}>
+            <IconBtn
+              onClick={() => setShowAppearancePanel((value) => !value)}
+              title="卡片外观">
+              <i className="ri-palette-line"></i>
+            </IconBtn>
+            {showAppearancePanel && (
+              <div className="kt-appearance-panel">
+                <div className="kt-appearance-title">
+                  <span>卡片外观</span>
+                  <span>主题与背景互斥</span>
+                </div>
+                <div className="kt-background-label">主题</div>
+                <div className="kt-style-grid">
+                  {CARD_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      title={`${style.name} · ${style.description}`}
+                      className={`kt-style-option${appearanceMode === "theme" && cardStyle === style.id ? " active" : ""}`}
+                      onClick={() =>
+                        onAppearanceChange({
+                          cardStyle: style.id,
+                          backgroundImage: "",
+                          cardShader: null
+                        })
+                      }>
+                      <span
+                        className="kt-style-preview"
+                        data-preview-style={style.id}>
+                        <span />
+                      </span>
+                      <span className="kt-style-name">{style.name}</span>
+                      <span className="kt-style-description">
+                        {style.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="kt-appearance-divider" />
+                <div className="kt-background-label">Shader 背景</div>
+                <div className="kt-shader-grid">
+                  {CARD_SHADERS.map((shader) => (
+                    <button
+                      key={shader.id}
+                      title={`${shader.name} · ${shader.description}`}
+                      className={`kt-shader-option${cardShader === shader.id ? " active" : ""}`}
+                      onClick={() =>
+                        onAppearanceChange({
+                          backgroundImage: "",
+                          cardShader: shader.id
+                        })
+                      }>
+                      <span
+                        className="kt-shader-preview"
+                        data-shader-preview={shader.id}
+                      />
+                      <span>{shader.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <a
+                  className="kt-paper-credit"
+                  href="https://shaders.paper.design"
+                  target="_blank"
+                  rel="noreferrer">
+                  Powered by Paper Shaders
+                </a>
+
+                <div className="kt-background-label">图片背景</div>
+                <div className="kt-background-source">
+                  <label
+                    className={`kt-background-upload${uploadingBackground ? " disabled" : ""}`}>
+                    <i className="ri-image-add-line"></i>
+                    {uploadingBackground ? "正在处理…" : "选择本地图片"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/avif"
+                      disabled={uploadingBackground}
+                      onChange={(e) => {
+                        const file = e.currentTarget.files?.[0]
+                        e.currentTarget.value = ""
+                        void uploadBackground(file)
+                      }}
+                    />
+                  </label>
+                  <span>自动压缩，最大边长 1440px</span>
+                </div>
+                {uploadError && (
+                  <div className="kt-background-error">{uploadError}</div>
+                )}
+                <div className="kt-background-or">或使用在线图片</div>
+                <div className="kt-background-row">
+                  <input
+                    id={`bg-${collection.id}`}
+                    value={backgroundDraft}
+                    onChange={(e) => {
+                      setBackgroundDraft(e.target.value)
+                      setBackgroundError(false)
+                      setUploadError("")
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") applyBackground()
+                    }}
+                    placeholder="粘贴图片 URL"
+                    aria-invalid={backgroundError}
+                  />
+                  <button onClick={applyBackground}>应用</button>
+                </div>
+                {backgroundError && (
+                  <div className="kt-background-error">请输入有效的 http(s) 图片地址</div>
+                )}
+                {appearanceMode === "image" && (
+                  <button
+                    className="kt-background-clear"
+                    onClick={() => {
+                      setBackgroundDraft("")
+                      setBackgroundError(false)
+                      setUploadError("")
+                      onAppearanceChange({ backgroundImage: "" })
+                    }}>
+                    移除背景图
+                  </button>
+                )}
+                {appearanceMode === "shader" && (
+                  <button
+                    className="kt-background-clear"
+                    onClick={() => onAppearanceChange({ cardShader: null })}>
+                    停用 Shader，恢复主题
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <IconBtn
             onClick={onToggleLinkColumns}
             title={`链接列数：${linkColumns} 列，点击切换`}>
@@ -667,12 +1082,12 @@ function CollectionCard({
               </button>
               {showMergeMenu && (
                 <div
+                  className="kt-merge-menu"
                   style={{
                     position: "absolute",
                     top: "100%",
                     right: 0,
                     marginTop: 4,
-                    background: "var(--bg)",
                     border: "1px solid var(--border)",
                     borderRadius: "var(--r)",
                     boxShadow: "var(--shadow-m)",
@@ -799,6 +1214,7 @@ function CollectionCard({
 
       {/* ── Tab list ── */}
       <div
+        className="kt-card-list"
         onDragOver={(e) => {
           e.preventDefault()
           e.dataTransfer.dropEffect = "move"
@@ -1073,6 +1489,7 @@ function CollectionPage() {
   const [showFontPanel, setShowFontPanel] = useState(false)
   const [theme, setTheme] = useState<Theme>("auto")
   const [beamEnabled, setBeamEnabled] = useState(BEAM_DEFAULT)
+  const [soundEnabled, setSoundEnabled] = useState(SOUND_DEFAULT)
   const [collectMode, setCollectMode] = useState<CollectMode>("all")
   const [windowColumns, setWindowColumns] = useState(WINDOW_COLUMNS_DEFAULT)
   const [collectionColumns, setCollectionColumns] = useState<
@@ -1098,6 +1515,7 @@ function CollectionPage() {
         FONT_SCALE_KEY,
         FONT_WEIGHT_KEY,
         BEAM_KEY,
+        SOUND_KEY,
         COLLECT_MODE_KEY,
         WINDOW_COLUMNS_KEY,
         COLLECTION_COLUMNS_KEY
@@ -1126,6 +1544,7 @@ function CollectionPage() {
           applyTheme(t)
         }
         if (typeof r[BEAM_KEY] === "boolean") setBeamEnabled(r[BEAM_KEY])
+        if (typeof r[SOUND_KEY] === "boolean") setSoundEnabled(r[SOUND_KEY])
         if (r[COLLECT_MODE_KEY] === "all" || r[COLLECT_MODE_KEY] === "current")
           setCollectMode(r[COLLECT_MODE_KEY])
         if (typeof r[WINDOW_COLUMNS_KEY] === "number")
@@ -1147,6 +1566,32 @@ function CollectionPage() {
     return () => document.removeEventListener("mousedown", h)
   }, [showFontPanel])
 
+  useEffect(() => {
+    if (!soundEnabled) return
+    let lastY = window.scrollY
+    let distance = 0
+    let direction = 0
+
+    const onScroll = () => {
+      const nextY = window.scrollY
+      const delta = nextY - lastY
+      lastY = nextY
+      if (delta === 0) return
+
+      const nextDirection = Math.sign(delta)
+      if (direction !== 0 && direction !== nextDirection) distance = 0
+      direction = nextDirection
+      distance += Math.abs(delta)
+      if (distance < 10) return
+
+      distance %= 10
+      playScrollGear(delta, true)
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [soundEnabled])
+
   /* ── Persist ── */
   const persist = async (updated: Collection[]) => {
     setCollections(updated)
@@ -1155,6 +1600,7 @@ function CollectionPage() {
 
   const toggleTheme = async () => {
     const next: Theme = isDark ? "light" : "dark"
+    playSound("toggle", soundEnabled)
     setTheme(next)
     applyTheme(next)
     await chrome.storage.local.set({ [THEME_KEY]: next })
@@ -1162,12 +1608,21 @@ function CollectionPage() {
 
   const toggleBeam = async () => {
     const next = !beamEnabled
+    playSound("toggle", soundEnabled)
     setBeamEnabled(next)
     await chrome.storage.local.set({ [BEAM_KEY]: next })
   }
 
+  const toggleSound = async () => {
+    const next = !soundEnabled
+    playSound("toggle", true)
+    setSoundEnabled(next)
+    await chrome.storage.local.set({ [SOUND_KEY]: next })
+  }
+
   const toggleCollectMode = async () => {
     const next: CollectMode = collectMode === "all" ? "current" : "all"
+    playSound("toggle", soundEnabled)
     setCollectMode(next)
     await chrome.storage.local.set({ [COLLECT_MODE_KEY]: next })
   }
@@ -1177,6 +1632,7 @@ function CollectionPage() {
       windowColumns >= WINDOW_COLUMNS_MAX
         ? WINDOW_COLUMNS_MIN
         : windowColumns + 1
+    playSound("toggle", soundEnabled)
     setWindowColumns(next)
     await chrome.storage.local.set({ [WINDOW_COLUMNS_KEY]: next })
   }
@@ -1187,11 +1643,37 @@ function CollectionPage() {
   const toggleCollectionColumns = async (id: string) => {
     const next = getCollectionColumns(id) === 1 ? 2 : 1
     const updated = { ...collectionColumns, [id]: next }
+    playSound("toggle", soundEnabled)
     setCollectionColumns(updated)
     await chrome.storage.local.set({ [COLLECTION_COLUMNS_KEY]: updated })
   }
 
+  const updateCollectionAppearance = async (
+    id: string,
+    appearance: CardAppearanceUpdate
+  ) => {
+    playSound("style", soundEnabled)
+    await persist(
+      collections.map((collection) => {
+        if (collection.id !== id) return collection
+        const updated = { ...collection }
+        if (appearance.cardStyle) updated.cardStyle = appearance.cardStyle
+        if ("backgroundImage" in appearance) {
+          if (appearance.backgroundImage)
+            updated.backgroundImage = appearance.backgroundImage
+          else delete updated.backgroundImage
+        }
+        if ("cardShader" in appearance) {
+          if (appearance.cardShader) updated.cardShader = appearance.cardShader
+          else delete updated.cardShader
+        }
+        return updated
+      })
+    )
+  }
+
   const selectFont = async (opt: SelectableFont) => {
+    playSound("toggle", soundEnabled)
     setFontId(opt.id)
     applyFont(opt)
     await chrome.storage.local.set({ [FONT_KEY]: opt.id })
@@ -1199,6 +1681,7 @@ function CollectionPage() {
 
   const changeFontScale = async (next: number) => {
     const v = clampScale(next)
+    playSound("tap", soundEnabled)
     setFontScale(v)
     applyFontScale(v)
     await chrome.storage.local.set({ [FONT_SCALE_KEY]: v })
@@ -1206,6 +1689,7 @@ function CollectionPage() {
 
   const changeFontWeight = async (next: FontWeightValue) => {
     const v = clampFontWeight(next)
+    playSound("toggle", soundEnabled)
     setFontWeight(v)
     applyFontWeight(v)
     await chrome.storage.local.set({ [FONT_WEIGHT_KEY]: v })
@@ -1215,6 +1699,7 @@ function CollectionPage() {
   const openAllTabs = async (id: string) => {
     const col = collections.find((c) => c.id === id)
     if (!col) return
+    playSound("complete", soundEnabled)
     for (const tab of col.tabs) {
       try {
         await chrome.tabs.create({ url: tab.url, active: false })
@@ -1228,6 +1713,7 @@ function CollectionPage() {
     url: string,
     idx: number
   ): Promise<Point | null> => {
+    playSound("open", soundEnabled)
     // 立即创建标签并即时从收集卡移除该行（保持原有反馈），随后用真实序号定位落点
     const createPromise = chrome.tabs
       .create({ url, active: false })
@@ -1252,6 +1738,7 @@ function CollectionPage() {
   }
 
   const deleteTab = async (colId: string, idx: number) => {
+    playSound("delete", soundEnabled)
     await persist(
       collections
         .map((c) =>
@@ -1263,13 +1750,16 @@ function CollectionPage() {
     )
   }
 
-  const deleteCollection = async (id: string) =>
-    persist(collections.filter((c) => c.id !== id))
+  const deleteCollection = async (id: string) => {
+    playSound("delete", soundEnabled)
+    await persist(collections.filter((c) => c.id !== id))
+  }
 
   const sortCollectionByDomain = async (
     id: string,
     order: DomainSortOrder
   ) => {
+    playSound("tap", soundEnabled)
     await persist(
       collections.map((c) =>
         c.id === id ? { ...c, tabs: sortTabsByDomain(c.tabs, order) } : c
@@ -1300,6 +1790,7 @@ function CollectionPage() {
       await persist(
         collections.map((c) => (c.id === sourceColId ? { ...c, tabs } : c))
       )
+      playSound("drop", soundEnabled)
       return
     }
 
@@ -1318,6 +1809,7 @@ function CollectionPage() {
       .filter((c) => c.tabs.length > 0)
 
     await persist(updated)
+    playSound("drop", soundEnabled)
   }
 
   const startTabDrag = (
@@ -1326,6 +1818,7 @@ function CollectionPage() {
     e: React.DragEvent
   ) => {
     const payload = { colId, index }
+    playSound("lift", soundEnabled)
     setDraggingTab(payload)
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify(payload))
@@ -1357,6 +1850,7 @@ function CollectionPage() {
   const splitCollection = async (id: string) => {
     const source = collections.find((c) => c.id === id)
     if (!source || source.tabs.length <= SPLIT_THRESHOLD) return
+    playSound("split", soundEnabled)
 
     const split = splitCollectionIntoTwo(source)
     const splitIds = split.map((c) => c.id)
@@ -1378,6 +1872,7 @@ function CollectionPage() {
   const gatherToCollection = async (targetId: string) => {
     const target = collections.find((c) => c.id === targetId)
     if (!target) return
+    playSound("merge", soundEnabled)
     const others = collections.filter((c) => c.id !== targetId)
     const allOtherTabs = others.flatMap((c) => c.tabs)
 
@@ -1395,6 +1890,7 @@ function CollectionPage() {
     const source = collections.find((c) => c.id === sourceId)
     const target = collections.find((c) => c.id === targetId)
     if (!source || !target) return
+    playSound("merge", soundEnabled)
 
     const newTarget = {
       ...target,
@@ -1413,6 +1909,7 @@ function CollectionPage() {
 
   const clearAll = async () => {
     if (!confirm(`确定要删除全部 ${collections.length} 条收集记录吗？`)) return
+    playSound("delete", soundEnabled)
     await persist([])
   }
 
@@ -1487,6 +1984,15 @@ function CollectionPage() {
               <i
                 className={
                   beamEnabled ? "ri-flashlight-fill" : "ri-flashlight-line"
+                }></i>
+            </NavBtn>
+            <NavBtn
+              onClick={toggleSound}
+              title={soundEnabled ? "关闭交互音效" : "开启交互音效"}
+              active={soundEnabled}>
+              <i
+                className={
+                  soundEnabled ? "ri-volume-up-fill" : "ri-volume-mute-line"
                 }></i>
             </NavBtn>
             <NavBtn
@@ -1633,6 +2139,9 @@ function CollectionPage() {
                       onTabDrop={dropTab}
                       onGather={() => gatherToCollection(col.id)}
                       onMergeTo={(targetId) => mergeCollectionTo(col.id, targetId)}
+                      onAppearanceChange={(appearance) =>
+                        updateCollectionAppearance(col.id, appearance)
+                      }
                     />
                   ))}
                 </div>

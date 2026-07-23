@@ -1,7 +1,7 @@
 {
   "name": "shiye-tabs",
   "displayName": "拾页 Shiye",
-  "version": "0.0.5",
+  "version": "0.0.14",
   "description": "A graceful tab collector for one-click capture and restore",
   "author": "z",
   "scripts": {
@@ -10,6 +10,7 @@
     "package": "plasmo package"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.77",
     "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0",
@@ -28,6 +29,7 @@
   },
   "manifest": {
     "host_permissions": [
+      "http://*/*",
       "https://*/*"
     ],
     "permissions": [
