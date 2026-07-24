@@ -1941,36 +1941,9 @@ function CollectionPage() {
             padding: "0 24px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between"
+            justifyContent: "center"
           }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-            <div>
-              <div
-                style={{
-                  fontSize: 17,
-                  fontWeight: "var(--fw-strong)",
-                  letterSpacing: "-.02em",
-                  color: "var(--text)",
-                  lineHeight: 1.15
-                }}>
-                拾页 Shiye
-              </div>
-              <div
-                style={{
-                  fontSize: 11.5,
-                  fontWeight: "var(--fw)",
-                  color: "var(--text3)",
-                  marginTop: 1
-                }}>
-                {loading
-                  ? "加载中…"
-                  : `${collections.length} 个记录 · ${totalTabs} 个标签页`}
-              </div>
-            </div>
-          </div>
-
-          {/* Right controls */}
+          {/* Controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <NavBtn
               onClick={toggleTheme}

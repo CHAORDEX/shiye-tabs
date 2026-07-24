@@ -1,7 +1,7 @@
 {
   "name": "shiye-tabs",
   "displayName": "拾页 Shiye",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "A graceful tab collector for one-click capture and restore",
   "author": "z",
   "scripts": {
