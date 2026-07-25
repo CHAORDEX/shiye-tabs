@@ -700,12 +700,13 @@ function CollectionCard({
   ) => void
   onTabDragEnd: () => void
   onTabDrop: (targetColId: string, targetIndex: number, e: React.DragEvent) => void
-  onGather: () => void
+  onGather: (sourceId?: string) => void
   onMergeTo: (targetId: string) => void
   onAppearanceChange: (appearance: CardAppearanceUpdate) => Promise<void>
 }) {
   const [hCard, setHCard] = useState(false)
   const [showMergeMenu, setShowMergeMenu] = useState(false)
+  const [showGatherMenu, setShowGatherMenu] = useState(false)
   const [showAppearancePanel, setShowAppearancePanel] = useState(false)
   const [backgroundDraft, setBackgroundDraft] = useState(() =>
     collection.backgroundImage?.startsWith("data:")
@@ -716,6 +717,7 @@ function CollectionCard({
   const [uploadingBackground, setUploadingBackground] = useState(false)
   const [uploadError, setUploadError] = useState("")
   const mergeMenuRef = useRef<HTMLDivElement>(null)
+  const gatherMenuRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -730,6 +732,19 @@ function CollectionCard({
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [showMergeMenu])
+
+  useEffect(() => {
+    if (!showGatherMenu) return
+    const h = (e: MouseEvent) => {
+      if (
+        gatherMenuRef.current &&
+        !gatherMenuRef.current.contains(e.target as Node)
+      )
+        setShowGatherMenu(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [showGatherMenu])
 
   useEffect(() => {
     setBackgroundDraft(
@@ -799,7 +814,7 @@ function CollectionCard({
       onMouseLeave={() => setHCard(false)}
       style={{
         position: "relative",
-        zIndex: showMergeMenu || showAppearancePanel ? 100 : 1,
+        zIndex: showMergeMenu || showGatherMenu || showAppearancePanel ? 100 : 1,
         background: "var(--card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--r)",
@@ -854,10 +869,16 @@ function CollectionCard({
               fontSize: fs(14.5),
               fontWeight: "var(--fw-strong)",
               color: "var(--text)",
-              flexShrink: 0,
-              letterSpacing: "-.01em"
+              letterSpacing: "-.01em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "7em"
             }}>
-            {formatDate(collection.timestamp)}
+            {(() => {
+              const t = collection.tabs[0]?.title || "";
+              return t.length > 7 ? t.slice(0, 7) + "…" : t;
+            })()}
           </span>
         </div>
 
@@ -1022,36 +1043,137 @@ function CollectionCard({
         </div>
         {otherCollections.length > 0 && (
           <div style={{ display: "flex", gap: 4, marginRight: 4 }}>
-            <button
-              title="归集：将其他所有卡片的标签页合并到当前卡片"
-              onClick={onGather}
-              style={{
-                width: 24,
-                height: 24,
-                padding: 0,
-                background: "transparent",
-                color: "var(--text3)",
-                border: "none",
-                borderRadius: "var(--r-s)",
-                fontSize: 13,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all var(--dur) var(--ease)"
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLButtonElement
-                el.style.background = "var(--bg3)"
-                el.style.color = "var(--text)"
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLButtonElement
-                el.style.background = "transparent"
-                el.style.color = "var(--text3)"
-              }}>
-              <i className="ri-game-line"></i>
-            </button>
+            <div style={{ position: "relative" }} ref={gatherMenuRef}>
+              <button
+                title="归集：将其他卡片的标签页合并到当前卡片"
+                onClick={() => setShowGatherMenu(!showGatherMenu)}
+                style={{
+                  width: 24,
+                  height: 24,
+                  padding: 0,
+                  background: showGatherMenu ? "var(--bg3)" : "transparent",
+                  color: showGatherMenu ? "var(--text)" : "var(--text3)",
+                  border: "none",
+                  borderRadius: "var(--r-s)",
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all var(--dur) var(--ease)"
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement
+                  if (!showGatherMenu) {
+                    el.style.background = "var(--bg3)"
+                    el.style.color = "var(--text)"
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement
+                  if (!showGatherMenu) {
+                    el.style.background = "transparent"
+                    el.style.color = "var(--text3)"
+                  }
+                }}>
+                <i className="ri-game-line"></i>
+              </button>
+              {showGatherMenu && (
+                <div
+                  className="kt-merge-menu"
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: 4,
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--r)",
+                    boxShadow: "var(--shadow-m)",
+                    padding: 4,
+                    minWidth: 160,
+                    zIndex: 10,
+                    maxHeight: 200,
+                    overflowY: "auto"
+                  }}>
+                  <div
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: 11,
+                      color: "var(--text3)",
+                      fontWeight: 500
+                    }}>
+                    归集来源...
+                  </div>
+                  <button
+                    onClick={() => {
+                      onGather()
+                      setShowGatherMenu(false)
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "6px 8px",
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      color: "var(--accent)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "background var(--dur) var(--ease)"
+                    }}
+                    onMouseEnter={(e) => {
+                      ;(
+                        e.currentTarget as HTMLButtonElement
+                      ).style.background = "var(--bg2)"
+                    }}
+                    onMouseLeave={(e) => {
+                      ;(
+                        e.currentTarget as HTMLButtonElement
+                      ).style.background = "transparent"
+                    }}>
+                    全部（{otherCollections.reduce((n, c) => n + c.tabs.length, 0)}个）
+                  </button>
+                  {otherCollections.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        onGather(c.id)
+                        setShowGatherMenu(false)
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "6px 8px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        color: "var(--text)",
+                        cursor: "pointer",
+                        transition: "background var(--dur) var(--ease)"
+                      }}
+                      onMouseEnter={(e) => {
+                        ;(
+                          e.currentTarget as HTMLButtonElement
+                        ).style.background = "var(--bg2)"
+                      }}
+                      onMouseLeave={(e) => {
+                        ;(
+                          e.currentTarget as HTMLButtonElement
+                        ).style.background = "transparent"
+                      }}>
+                      {(() => {
+                        const t = c.tabs[0]?.title || "";
+                        return t.length > 7 ? t.slice(0, 7) + "…" : t;
+                      })()} ({c.tabs.length}个)
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div style={{ position: "relative" }} ref={mergeMenuRef}>
               <button
                 title="投奔：将当前卡片的标签页合并到其他卡片"
@@ -1877,21 +1999,34 @@ function CollectionPage() {
     }, 720)
   }
 
-  const gatherToCollection = async (targetId: string) => {
+  const gatherToCollection = async (targetId: string, sourceId?: string) => {
     const target = collections.find((c) => c.id === targetId)
     if (!target) return
     playSound("merge", soundEnabled)
-    const others = collections.filter((c) => c.id !== targetId)
-    const allOtherTabs = others.flatMap((c) => c.tabs)
 
-    // Create new array with merged tabs
-    const newTarget = {
-      ...target,
-      tabs: [...target.tabs, ...allOtherTabs]
+    if (sourceId) {
+      // Gather from a single source
+      const source = collections.find((c) => c.id === sourceId)
+      if (!source) return
+      const newTarget = {
+        ...target,
+        tabs: [...target.tabs, ...source.tabs]
+      }
+      await persist(
+        collections
+          .map((c) => (c.id === targetId ? newTarget : c))
+          .filter((c) => c.id !== sourceId)
+      )
+    } else {
+      // Gather all others
+      const others = collections.filter((c) => c.id !== targetId)
+      const allOtherTabs = others.flatMap((c) => c.tabs)
+      const newTarget = {
+        ...target,
+        tabs: [...target.tabs, ...allOtherTabs]
+      }
+      await persist([newTarget])
     }
-
-    // Only keep the target collection
-    await persist([newTarget])
   }
 
   const mergeCollectionTo = async (sourceId: string, targetId: string) => {
@@ -2119,7 +2254,7 @@ function CollectionPage() {
                       onTabDragStart={startTabDrag}
                       onTabDragEnd={endTabDrag}
                       onTabDrop={dropTab}
-                      onGather={() => gatherToCollection(col.id)}
+                      onGather={(sourceId) => gatherToCollection(col.id, sourceId)}
                       onMergeTo={(targetId) => mergeCollectionTo(col.id, targetId)}
                       onAppearanceChange={(appearance) =>
                         updateCollectionAppearance(col.id, appearance)
