@@ -9,6 +9,7 @@ export type SoundCue =
   | "split"
   | "complete"
   | "style"
+  | "hover"
 
 let context: AudioContext | null = null
 let output: GainNode | null = null
@@ -247,6 +248,21 @@ export function playSound(cue: SoundCue, enabled: boolean) {
           endFrequency: 1320,
           duration: 0.16,
           volume: 0.009
+        })
+        break
+      case "hover":
+        tone(ctx, destination, {
+          frequency: 1800,
+          endFrequency: 2400,
+          duration: 0.04,
+          volume: 0.012,
+          type: "sine"
+        })
+        noise(ctx, destination, {
+          duration: 0.006,
+          volume: 0.008,
+          frequency: 4800,
+          filter: "highpass"
         })
         break
     }

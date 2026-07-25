@@ -505,6 +505,7 @@ function IconBtn({
 function TabItem({
   tab,
   beamEnabled,
+  soundEnabled,
   dragging,
   onOpen,
   onDelete,
@@ -515,6 +516,7 @@ function TabItem({
   tab: TabInfo
   /** 是否在打开标签时播放光束动画 */
   beamEnabled: boolean
+  soundEnabled: boolean
   dragging: boolean
   /** 触发打开；返回真实落点的 Promise（标签创建后才确定），供光束飞向其位置 */
   onOpen: () => Promise<Point | null> | void
@@ -569,7 +571,10 @@ function TabItem({
         setDragOver(false)
         onDrop(e)
       }}
-      onMouseEnter={() => setH(true)}
+      onMouseEnter={() => {
+        setH(true)
+        playSound("hover", soundEnabled)
+      }}
       onMouseLeave={() => setH(false)}
       style={{
         display: "flex",
@@ -656,6 +661,7 @@ function CollectionCard({
   collection,
   otherCollections,
   beamEnabled,
+  soundEnabled,
   splitAnimating,
   draggingTab,
   linkColumns,
@@ -676,6 +682,7 @@ function CollectionCard({
   collection: Collection
   otherCollections: Collection[]
   beamEnabled: boolean
+  soundEnabled: boolean
   splitAnimating: boolean
   draggingTab: DraggedTab | null
   linkColumns: number
@@ -1231,6 +1238,7 @@ function CollectionCard({
             key={`${tab.url}-${index}`}
             tab={tab}
             beamEnabled={beamEnabled}
+            soundEnabled={soundEnabled}
             dragging={
               draggingTab?.colId === collection.id && draggingTab.index === index
             }
@@ -2095,6 +2103,7 @@ function CollectionPage() {
                       collection={col}
                       otherCollections={collections.filter((c) => c.id !== col.id)}
                       beamEnabled={beamEnabled}
+                      soundEnabled={soundEnabled}
                       splitAnimating={splitAnimatingIds.has(col.id)}
                       draggingTab={draggingTab}
                       linkColumns={getCollectionColumns(col.id)}
