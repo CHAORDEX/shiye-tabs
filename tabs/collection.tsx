@@ -2056,6 +2056,50 @@ function CollectionPage() {
     await persist([])
   }
 
+  /* ── Export / Import ── */
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  const exportData = () => {
+    const data = collections.map((c) =>
+      c.tabs.map((t) => ({ title: t.title, url: t.url }))
+    )
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json"
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `shiye-tabs-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!Array.isArray(data)) throw new Error("invalid")
+      const newCollections: Collection[] = data.map(
+        (group: { title: string; url: string }[]) => ({
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          tabs: (Array.isArray(group) ? group : []).map((t) => ({
+            title: String(t.title || ""),
+            url: String(t.url || "")
+          }))
+        })
+      )
+      await persist([...collections, ...newCollections.filter((c) => c.tabs.length > 0)])
+      playSound("merge", soundEnabled)
+    } catch {
+      alert("导入失败：文件格式不正确")
+    }
+    // reset so same file can be re-imported
+    e.target.value = ""
+  }
+
   /* ── Render ── */
   return (
     <div
@@ -2140,6 +2184,21 @@ function CollectionPage() {
               active={showFontPanel}>
               <i className="ri-font-serif"></i>
             </NavBtn>
+            {!loading && collections.length > 0 && (
+              <NavBtn onClick={exportData} title="导出全部">
+                <i className="ri-download-2-line" style={{ fontSize: 14 }}></i>
+              </NavBtn>
+            )}
+            <NavBtn onClick={() => importFileRef.current?.click()} title="导入">
+              <i className="ri-upload-2-line" style={{ fontSize: 14 }}></i>
+            </NavBtn>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={importData}
+            />
             {!loading && collections.length > 0 && (
               <NavBtn onClick={clearAll} title="清空全部">
                 <i className="ri-skull-line" style={{ fontSize: 14 }}></i>
