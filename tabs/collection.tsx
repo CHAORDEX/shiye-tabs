@@ -4,7 +4,15 @@ import {
   GrainGradient,
   MeshGradient,
   NeuroNoise,
-  Waves
+  Waves,
+  SmokeRing,
+  Metaballs,
+  GodRays,
+  SimplexNoise,
+  Voronoi,
+  Swirl,
+  Warp,
+  DotOrbit
 } from "@paper-design/shaders-react"
 
 import "remixicon/fonts/remixicon.css"
@@ -18,8 +26,8 @@ import { playScrollGear, playSound } from "./sounds"
 /* ── Types ──────────────────────────────────────────────────── */
 type Theme = "light" | "dark" | "auto"
 type DomainSortOrder = "asc" | "desc"
-type CardStyle = "classic" | "paper" | "glass" | "noir" | "aurora"
-type CardShader = "mesh" | "neuro" | "grain" | "waves"
+type CardStyle = "classic" | "paper" | "glass" | "noir" | "aurora" | "ocean" | "sunset" | "lavender" | "forest" | "rose" | "slate" | "amber"
+type CardShader = "mesh" | "neuro" | "grain" | "waves" | "smoke" | "metaballs" | "godRays" | "simplex" | "voronoi" | "swirl" | "warp" | "dotOrbit"
 
 interface DraggedTab {
   colId: string
@@ -97,7 +105,14 @@ const CARD_STYLES: Array<{
   { id: "paper", name: "纸感", description: "温润自然" },
   { id: "glass", name: "雾玻璃", description: "轻盈通透" },
   { id: "noir", name: "夜幕", description: "深邃沉静" },
-  { id: "aurora", name: "流光", description: "柔和灵动" }
+  { id: "aurora", name: "流光", description: "柔和灵动" },
+  { id: "ocean", name: "深海", description: "清凉沉稳" },
+  { id: "sunset", name: "晚霞", description: "绮丽暖意" },
+  { id: "lavender", name: "薰衣草", description: "淡雅紫韵" },
+  { id: "forest", name: "森丘", description: "静谧深绿" },
+  { id: "rose", name: "粉黑", description: "柔美精致" },
+  { id: "slate", name: "睡岩", description: "冷峻理性" },
+  { id: "amber", name: "琥珀", description: "金曜温醒" }
 ]
 
 const CARD_SHADERS: Array<{
@@ -108,7 +123,15 @@ const CARD_SHADERS: Array<{
   { id: "mesh", name: "暮色织网", description: "柔和流动的网格渐变" },
   { id: "neuro", name: "神经微光", description: "有机呼吸的噪声光影" },
   { id: "grain", name: "颗粒潮汐", description: "带纸张颗粒的色彩潮汐" },
-  { id: "waves", name: "静谧波纹", description: "克制而有秩序的波浪" }
+  { id: "waves", name: "静谧波纹", description: "克制而有秩序的波浪" },
+  { id: "smoke", name: "烟环漫舞", description: "如缕如雾的烟环缠绕" },
+  { id: "metaballs", name: "液态融球", description: "变形融合的有机球体" },
+  { id: "godRays", name: "天光万丈", description: "从中心辐射的光束" },
+  { id: "simplex", name: "晶体噪声", description: "单纯变化的噪点曲线" },
+  { id: "voronoi", name: "泰森割图", description: "几何细胞的明暗交错" },
+  { id: "swirl", name: "螺旋涡流", description: "向内旋转的彩带" },
+  { id: "warp", name: "扇面扇染", description: "扁平花纹的柔和扭曲" },
+  { id: "dotOrbit", name: "星球轨迹", description: "旋转走马灯般的圆点" }
 ]
 
 /** 打开标签时的光束动画默认开启 */
@@ -295,6 +318,106 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
           proportion={0.75}
           softness={0.12}
           scale={0.52}
+        />
+      )}
+      {visible && shader === "smoke" && (
+        <SmokeRing
+          {...common}
+          colorBack="#0c0e14"
+          colors={["#6e3c8e", "#2d6fa8", "#c46e3e"]}
+          noiseScale={1.4}
+          thickness={0.6}
+          radius={0.45}
+          speed={speed * 0.6}
+        />
+      )}
+      {visible && shader === "metaballs" && (
+        <Metaballs
+          {...common}
+          colorBack="#0b1220"
+          colors={["#ff6b4a", "#4ecdc4", "#ffe66d"]}
+          count={6}
+          size={0.62}
+          speed={speed * 0.7}
+        />
+      )}
+      {visible && shader === "godRays" && (
+        <GodRays
+          {...common}
+          colorBack="#08090d"
+          colorBloom="#3b2b1a"
+          colors={["#e8a547", "#d4593a", "#8b3a62"]}
+          spotty={0.5}
+          midSize={0.32}
+          midIntensity={0.55}
+          density={4.2}
+          intensity={0.42}
+          bloom={0.22}
+          speed={speed * 0.5}
+        />
+      )}
+      {visible && shader === "simplex" && (
+        <SimplexNoise
+          {...common}
+          colors={["#1a1a2e", "#16213e", "#0f3460", "#533483"]}
+          stepsPerColor={4}
+          softness={0.6}
+          speed={speed * 0.5}
+        />
+      )}
+      {visible && shader === "voronoi" && (
+        <Voronoi
+          {...common}
+          colors={["#1b1f3b", "#3a506b", "#5bc0be", "#0b132b"]}
+          stepsPerColor={3}
+          colorGap="#0a0e1a"
+          colorGlow="#6fffe9"
+          distortion={0.3}
+          gap={0.04}
+          glow={0.25}
+          speed={speed * 0.4}
+        />
+      )}
+      {visible && shader === "swirl" && (
+        <Swirl
+          {...common}
+          colorBack="#0a0a1a"
+          colors={["#f72585", "#7209b7", "#3a0ca3", "#4cc9f0"]}
+          bandCount={8}
+          twist={2.5}
+          center={0.3}
+          proportion={0.6}
+          softness={0.4}
+          noiseFrequency={0.8}
+          noise={0.3}
+          speed={speed * 0.5}
+        />
+      )}
+      {visible && shader === "warp" && (
+        <Warp
+          {...common}
+          colors={["#2d0a31", "#6b2d5b", "#c94c4c", "#f4a261", "#e9c46a"]}
+          rotation={0.4}
+          proportion={0.5}
+          softness={0.6}
+          shape="checks"
+          shapeScale={1.2}
+          distortion={0.7}
+          swirl={1.2}
+          swirlIterations={3}
+          speed={speed * 0.4}
+        />
+      )}
+      {visible && shader === "dotOrbit" && (
+        <DotOrbit
+          {...common}
+          colorBack="#0d1117"
+          colors={["#58a6ff", "#bc8cff", "#39d353", "#f78166"]}
+          size={0.55}
+          sizeRange={0.3}
+          spreading={0.6}
+          stepsPerColor={2}
+          speed={speed * 0.6}
         />
       )}
     </div>
