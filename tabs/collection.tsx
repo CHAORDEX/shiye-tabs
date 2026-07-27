@@ -796,15 +796,29 @@ function TabItem({
         {tab.title}
       </span>
 
-      {/* Actions — visible on row hover */}
+      {/* Actions — visible on row hover or when locked */}
       <div
         style={{
           display: "flex",
           gap: 2,
           flexShrink: 0,
-          opacity: h ? 1 : 0,
+          opacity: tab.locked ? 1 : h ? 1 : 0,
           transition: "opacity var(--dur) var(--ease)"
         }}>
+        <IconBtn
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleLock()
+          }}
+          title={tab.locked ? "取消链接锁定" : "锁定链接（打开时不移除）"}
+          accent={tab.locked}>
+          <i
+            className={tab.locked ? "ri-lock-fill" : "ri-lock-unlock-line"}
+            style={{
+              fontSize: 12,
+              color: tab.locked ? "var(--accent)" : undefined
+            }}></i>
+        </IconBtn>
         <IconBtn onClick={handleOpen} title="打开标签" accent hint>
           <i className="ri-external-link-line"></i>
         </IconBtn>
