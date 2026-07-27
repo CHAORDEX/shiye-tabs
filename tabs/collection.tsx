@@ -37,6 +37,7 @@ interface DraggedTab {
 interface TabInfo {
   title: string
   url: string
+  locked?: boolean
 }
 
 interface Collection {
@@ -47,6 +48,7 @@ interface Collection {
   cardStyle?: CardStyle
   backgroundImage?: string
   cardShader?: CardShader
+  locked?: boolean
 }
 
 interface CardAppearanceUpdate {
@@ -541,23 +543,25 @@ function sortTabsByDomain(tabs: TabInfo[], order: DomainSortOrder) {
 }
 
 function estimateCollectionHeight(collection: Collection, linkColumns = 1) {
-  return 92 + Math.ceil(collection.tabs.length / linkColumns) * 32
+  const tabCount = collection.tabs?.length || 0
+  return 92 + Math.ceil(tabCount / linkColumns) * 32
 }
 
 function distributeCollections(
   collections: Collection[],
   columnCount: number,
-  collectionColumns: Record<string, number>
+  collectionColumns: Record<string, number> | null | undefined
 ) {
+  const safeCols = collectionColumns || {}
   const columns = Array.from({ length: columnCount }, () => [] as Collection[])
   const heights = Array.from({ length: columnCount }, () => 0)
 
-  collections.forEach((collection) => {
+  ;(collections || []).forEach((collection) => {
     const target = heights.indexOf(Math.min(...heights))
     columns[target].push(collection)
     heights[target] += estimateCollectionHeight(
       collection,
-      clampCollectionColumns(collectionColumns[collection.id])
+      clampCollectionColumns(safeCols[collection.id])
     )
   })
 
@@ -663,6 +667,7 @@ function TabItem({
   dragging,
   onOpen,
   onDelete,
+  onToggleLock,
   onDragStart,
   onDragEnd,
   onDrop
@@ -675,6 +680,7 @@ function TabItem({
   /** 触发打开；返回真实落点的 Promise（标签创建后才确定），供光束飞向其位置 */
   onOpen: () => Promise<Point | null> | void
   onDelete: () => void
+  onToggleLock: () => void
   onDragStart: (e: React.DragEvent) => void
   onDragEnd: () => void
   onDrop: (e: React.DragEvent) => void
@@ -831,7 +837,9 @@ function CollectionCard({
   onTabDrop,
   onGather,
   onMergeTo,
-  onAppearanceChange
+  onAppearanceChange,
+  onToggleLock,
+  onToggleTabLock
 }: {
   collection: Collection
   otherCollections: Collection[]
@@ -857,6 +865,8 @@ function CollectionCard({
   onGather: (sourceId?: string) => void
   onMergeTo: (targetId: string) => void
   onAppearanceChange: (appearance: CardAppearanceUpdate) => Promise<void>
+  onToggleLock: () => void
+  onToggleTabLock: (tabIndex: number) => void
 }) {
   const [hCard, setHCard] = useState(false)
   const [showMergeMenu, setShowMergeMenu] = useState(false)
@@ -1016,7 +1026,7 @@ function CollectionCard({
               fontWeight: "var(--fw)",
               color: "var(--text3)"
             }}>
-            {collection.tabs.length} 个标签页
+            {collection.tabs?.length || 0} 个标签页
           </span>
           <span
             style={{
@@ -1030,7 +1040,7 @@ function CollectionCard({
               maxWidth: "7em"
             }}>
             {(() => {
-              const t = collection.tabs[0]?.title || "";
+              const t = collection.tabs?.[0]?.title || "";
               return t.length > 7 ? t.slice(0, 7) + "…" : t;
             })()}
           </span>
@@ -1038,6 +1048,20 @@ function CollectionCard({
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 4, marginRight: 4 }}>
+          <IconBtn
+            onClick={onToggleLock}
+            title={
+              collection.locked
+                ? "窗口已锁定：打开全部时不自动删除此窗口"
+                : "锁定窗口"
+            }
+            accent={collection.locked}>
+            <i
+              className={collection.locked ? "ri-lock-fill" : "ri-lock-unlock-line"}
+              style={{
+                color: collection.locked ? "var(--accent)" : undefined
+              }}></i>
+          </IconBtn>
           <div style={{ position: "relative" }} ref={appearanceRef}>
             <IconBtn
               onClick={() => setShowAppearancePanel((value) => !value)}
@@ -1287,7 +1311,7 @@ function CollectionCard({
                         e.currentTarget as HTMLButtonElement
                       ).style.background = "transparent"
                     }}>
-                    全部（{otherCollections.reduce((n, c) => n + c.tabs.length, 0)}个）
+                    全部（{otherCollections.reduce((n, c) => n + (c.tabs?.length || 0), 0)}个）
                   </button>
                   {otherCollections.map((c) => (
                     <button
@@ -1320,9 +1344,9 @@ function CollectionCard({
                         ).style.background = "transparent"
                       }}>
                       {(() => {
-                        const t = c.tabs[0]?.title || "";
+                        const t = c.tabs?.[0]?.title || "";
                         return t.length > 7 ? t.slice(0, 7) + "…" : t;
-                      })()} ({c.tabs.length}个)
+                      })()} ({(c.tabs?.length || 0)}个)
                     </button>
                   ))}
                 </div>
@@ -1502,14 +1526,14 @@ function CollectionCard({
           e.preventDefault()
           e.dataTransfer.dropEffect = "move"
         }}
-        onDrop={(e) => onTabDrop(collection.id, collection.tabs.length, e)}
+        onDrop={(e) => onTabDrop(collection.id, (collection.tabs?.length || 0), e)}
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(${linkColumns}, minmax(0, 1fr))`,
           gap: 2,
           padding: "8px 8px"
         }}>
-        {collection.tabs.map((tab, index) => (
+        {(collection.tabs || []).map((tab, index) => (
           <TabItem
             key={`${tab.url}-${index}`}
             tab={tab}
@@ -1520,6 +1544,7 @@ function CollectionCard({
             }
             onOpen={() => onOpenTab(tab.url, index)}
             onDelete={() => onDeleteTab(index)}
+            onToggleLock={() => onToggleTabLock(index)}
             onDragStart={(e) => onTabDragStart(collection.id, index, e)}
             onDragEnd={onTabDragEnd}
             onDrop={(e) => onTabDrop(collection.id, index, e)}
@@ -1791,7 +1816,7 @@ function CollectionPage() {
   const [draggingTab, setDraggingTab] = useState<DraggedTab | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
 
-  const totalTabs = collections.reduce((n, c) => n + c.tabs.length, 0)
+  const totalTabs = collections.reduce((n, c) => n + (c.tabs?.length || 0), 0)
   const isDark = theme === "dark" || (theme === "auto" && systemIsDark())
   const pageMaxWidth = windowColumns * 500 + (windowColumns - 1) * 12
 
@@ -1811,8 +1836,17 @@ function CollectionPage() {
         COLLECTION_COLUMNS_KEY
       ])
       .then((r) => {
-        if (r.collections && Array.isArray(r.collections))
-          setCollections(r.collections)
+        if (r.collections && Array.isArray(r.collections)) {
+          const sanitized = r.collections
+            .filter((c: any) => c && typeof c === "object")
+            .map((c: any) => ({
+              ...c,
+              tabs: Array.isArray(c.tabs)
+                ? c.tabs.filter((t: any) => t && typeof t === "object")
+                : []
+            }))
+          setCollections(sanitized)
+        }
         if (r[FONT_KEY]) {
           const opt = ALL_FONTS.find((f) => f.id === r[FONT_KEY]) ?? SYSTEM_FONT
           setFontId(opt.id)
@@ -1839,8 +1873,17 @@ function CollectionPage() {
           setCollectMode(r[COLLECT_MODE_KEY])
         if (typeof r[WINDOW_COLUMNS_KEY] === "number")
           setWindowColumns(clampWindowColumns(r[WINDOW_COLUMNS_KEY]))
-        if (r[COLLECTION_COLUMNS_KEY] && typeof r[COLLECTION_COLUMNS_KEY] === "object")
+        if (
+          r[COLLECTION_COLUMNS_KEY] &&
+          typeof r[COLLECTION_COLUMNS_KEY] === "object" &&
+          r[COLLECTION_COLUMNS_KEY] !== null
+        )
           setCollectionColumns(r[COLLECTION_COLUMNS_KEY])
+      })
+      .catch((err) => {
+        console.error("[拾页] 异步数据解包异常:", err)
+      })
+      .finally(() => {
         setLoading(false)
       })
   }, [])
@@ -1928,11 +1971,12 @@ function CollectionPage() {
   }
 
   const getCollectionColumns = (id: string) =>
-    clampCollectionColumns(collectionColumns[id])
+    clampCollectionColumns(collectionColumns?.[id])
 
   const toggleCollectionColumns = async (id: string) => {
+    const safeCols = collectionColumns || {}
     const next = getCollectionColumns(id) === 1 ? 2 : 1
-    const updated = { ...collectionColumns, [id]: next }
+    const updated = { ...safeCols, [id]: next }
     playSound("toggle", soundEnabled)
     setCollectionColumns(updated)
     await chrome.storage.local.set({ [COLLECTION_COLUMNS_KEY]: updated })
@@ -1995,7 +2039,18 @@ function CollectionPage() {
         await chrome.tabs.create({ url: tab.url, active: false })
       } catch {}
     }
-    await persist(collections.filter((c) => c.id !== id))
+    // 窗口加锁：保留卡片及全部链接
+    if (col.locked) return
+
+    // 窗口未加锁：保留锁定链接；若全未锁定则删除窗口
+    const remainingTabs = col.tabs.filter((t) => t.locked)
+    if (remainingTabs.length === 0) {
+      await persist(collections.filter((c) => c.id !== id))
+    } else {
+      await persist(
+        collections.map((c) => (c.id === id ? { ...c, tabs: remainingTabs } : c))
+      )
+    }
   }
 
   const openSingleTab = async (
@@ -2004,19 +2059,25 @@ function CollectionPage() {
     idx: number
   ): Promise<Point | null> => {
     playSound("open", soundEnabled)
-    // 立即创建标签并即时从收集卡移除该行（保持原有反馈），随后用真实序号定位落点
+    const col = collections.find((c) => c.id === colId)
+    const targetTab = col?.tabs[idx]
+
     const createPromise = chrome.tabs
       .create({ url, active: false })
       .catch(() => null)
-    await persist(
-      collections
-        .map((c) =>
-          c.id !== colId
-            ? c
-            : { ...c, tabs: c.tabs.filter((_, i) => i !== idx) }
-        )
-        .filter((c) => c.tabs.length > 0)
-    )
+
+    // 如果链接未锁定，将其从卡片中移除
+    if (!targetTab?.locked) {
+      await persist(
+        collections
+          .map((c) => {
+            if (c.id !== colId) return c
+            return { ...c, tabs: c.tabs.filter((_, i) => i !== idx) }
+          })
+          .filter((c) => c.locked || c.tabs.length > 0)
+      )
+    }
+
     try {
       const created = await createPromise
       if (!created || typeof created.index !== "number") return null
@@ -2031,18 +2092,39 @@ function CollectionPage() {
     playSound("delete", soundEnabled)
     await persist(
       collections
-        .map((c) =>
-          c.id !== colId
-            ? c
-            : { ...c, tabs: c.tabs.filter((_, i) => i !== idx) }
-        )
-        .filter((c) => c.tabs.length > 0)
+        .map((c) => {
+          if (c.id !== colId) return c
+          return { ...c, tabs: c.tabs.filter((_, i) => i !== idx) }
+        })
+        .filter((c) => c.locked || c.tabs.length > 0)
     )
   }
 
   const deleteCollection = async (id: string) => {
     playSound("delete", soundEnabled)
     await persist(collections.filter((c) => c.id !== id))
+  }
+
+  const toggleCollectionLock = async (id: string) => {
+    playSound("toggle", soundEnabled)
+    await persist(
+      collections.map((c) =>
+        c.id === id ? { ...c, locked: !c.locked } : c
+      )
+    )
+  }
+
+  const toggleTabLock = async (colId: string, idx: number) => {
+    playSound("toggle", soundEnabled)
+    await persist(
+      collections.map((c) => {
+        if (c.id !== colId) return c
+        const newTabs = c.tabs.map((t, i) =>
+          i === idx ? { ...t, locked: !t.locked } : t
+        )
+        return { ...c, tabs: newTabs }
+      })
+    )
   }
 
   const sortCollectionByDomain = async (
@@ -2211,19 +2293,35 @@ function CollectionPage() {
   }
 
   const clearAll = async () => {
-    if (!confirm(`确定要删除全部 ${collections.length} 条收集记录吗？`)) return
-    if (!confirm(`二次确认：删除后无法恢复，确认清空？`)) return
+    const hasLocked = collections.some(
+      (c) => c.locked || c.tabs.some((t) => t.locked)
+    )
+    if (
+      !confirm(
+        `确定要删除 ${hasLocked ? "所有未锁定" : "全部"} ${collections.length} 条收集记录吗？`
+      )
+    )
+      return
+    if (!confirm(`二次确认：确认清空？`)) return
     playSound("delete", soundEnabled)
-    await persist([])
+    const remaining = collections
+      .filter((c) => c.locked || c.tabs.some((t) => t.locked))
+      .map((c) => (c.locked ? c : { ...c, tabs: c.tabs.filter((t) => t.locked) }))
+    await persist(remaining)
   }
 
   /* ── Export / Import ── */
   const importFileRef = useRef<HTMLInputElement>(null)
 
   const exportData = () => {
-    const data = collections.map((c) =>
-      c.tabs.map((t) => ({ title: t.title, url: t.url }))
-    )
+    const data = collections.map((c) => ({
+      locked: c.locked,
+      tabs: c.tabs.map((t) => ({
+        title: t.title,
+        url: t.url,
+        locked: t.locked
+      }))
+    }))
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json"
     })
@@ -2242,17 +2340,24 @@ function CollectionPage() {
       const text = await file.text()
       const data = JSON.parse(text)
       if (!Array.isArray(data)) throw new Error("invalid")
-      const newCollections: Collection[] = data.map(
-        (group: { title: string; url: string }[]) => ({
+      const newCollections: Collection[] = data.map((item: any) => {
+        const isGroupArray = Array.isArray(item)
+        const tabsData = isGroupArray ? item : item.tabs || []
+        return {
           id: crypto.randomUUID(),
           timestamp: Date.now(),
-          tabs: (Array.isArray(group) ? group : []).map((t) => ({
+          locked: isGroupArray ? false : Boolean(item.locked),
+          tabs: (Array.isArray(tabsData) ? tabsData : []).map((t: any) => ({
             title: String(t.title || ""),
-            url: String(t.url || "")
+            url: String(t.url || ""),
+            locked: Boolean(t.locked)
           }))
-        })
-      )
-      await persist([...collections, ...newCollections.filter((c) => c.tabs.length > 0)])
+        }
+      })
+      await persist([
+        ...collections,
+        ...newCollections.filter((c) => c.tabs.length > 0)
+      ])
       playSound("merge", soundEnabled)
     } catch {
       alert("导入失败：文件格式不正确")
@@ -2476,6 +2581,8 @@ function CollectionPage() {
                       onTabDrop={dropTab}
                       onGather={(sourceId) => gatherToCollection(col.id, sourceId)}
                       onMergeTo={(targetId) => mergeCollectionTo(col.id, targetId)}
+                      onToggleLock={() => toggleCollectionLock(col.id)}
+                      onToggleTabLock={(idx) => toggleTabLock(col.id, idx)}
                       onAppearanceChange={(appearance) =>
                         updateCollectionAppearance(col.id, appearance)
                       }
