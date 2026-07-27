@@ -640,12 +640,14 @@ html[data-theme="dark"] .kt-nav {
   font-size: 10px;
   font-weight: 500;
 }
-.kt-style-grid {
+.kt-style-grid,
+.kt-shader-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
-.kt-style-option {
+.kt-style-option,
+.kt-shader-option {
   min-width: 0;
   padding: 4px;
   border: 1px solid transparent;
@@ -657,13 +659,16 @@ html[data-theme="dark"] .kt-nav {
   text-align: left;
   transition: all var(--dur) var(--ease);
 }
-.kt-style-option:hover { background: var(--bg2); }
-.kt-style-option.active {
+.kt-style-option:hover,
+.kt-shader-option:hover { background: var(--bg2); }
+.kt-style-option.active,
+.kt-shader-option.active {
   color: var(--accent);
   background: var(--accent-bg);
   border-color: var(--accent);
 }
-.kt-style-preview {
+.kt-style-preview,
+.kt-shader-preview {
   display: block;
   position: relative;
   height: 38px;
@@ -672,8 +677,10 @@ html[data-theme="dark"] .kt-nav {
   border: 1px solid rgba(80, 80, 80, .16);
   border-radius: 6px;
   background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
 }
-.kt-style-preview span {
+.kt-style-preview span,
+.kt-shader-preview span {
   position: absolute;
   right: 5px;
   bottom: 5px;
@@ -704,39 +711,6 @@ html[data-theme="dark"] .kt-nav {
 .kt-style-name { font-size: 10px; font-weight: 700; text-align: center; }
 .kt-style-description { display: none; }
 .kt-appearance-divider { height: 1px; margin: 12px 0; background: var(--border); }
-.kt-shader-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-.kt-shader-option {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  padding: 4px;
-  color: var(--text2);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font: 600 10px var(--font);
-  text-align: left;
-  cursor: pointer;
-  transition: all var(--dur) var(--ease);
-}
-.kt-shader-option:hover { background: var(--bg2); border-color: var(--border2); }
-.kt-shader-option.active {
-  color: var(--accent);
-  background: var(--accent-bg);
-  border-color: var(--accent);
-}
-.kt-shader-preview {
-  width: 34px;
-  height: 26px;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
-}
 .kt-shader-preview[data-shader-preview="mesh"] { background: linear-gradient(135deg, #101827, #275769 45%, #b86f55 76%, #e6b56d); }
 .kt-shader-preview[data-shader-preview="neuro"] { background: radial-gradient(circle at 32% 30%, #dce7ff, #776bb4 35%, #111827 72%); }
 .kt-shader-preview[data-shader-preview="grain"] { background: radial-gradient(circle at 70% 20%, #e8b86d, #3d8b79 46%, #142b2a 76%); }

@@ -1131,9 +1131,10 @@ function CollectionCard({
                       }>
                       <span
                         className="kt-shader-preview"
-                        data-shader-preview={shader.id}
-                      />
-                      <span>{shader.name}</span>
+                        data-shader-preview={shader.id}>
+                        <span />
+                      </span>
+                      <span className="kt-style-name">{shader.name}</span>
                     </button>
                   ))}
                 </div>
