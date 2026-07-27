@@ -226,12 +226,28 @@ async function compressBackgroundImage(file: File): Promise<string> {
   return dataUrl
 }
 
+/** WebGL 可用性检测（只执行一次，缓存结果） */
+let _webglSupported: boolean | null = null
+function isWebGLSupported(): boolean {
+  if (_webglSupported !== null) return _webglSupported
+  try {
+    const c = document.createElement("canvas")
+    _webglSupported = !!(
+      c.getContext("webgl2") || c.getContext("webgl")
+    )
+  } catch {
+    _webglSupported = false
+  }
+  return _webglSupported
+}
+
 function CardShaderBackground({ shader }: { shader: CardShader }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(() =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
+  const webgl = isWebGLSupported()
 
   useEffect(() => {
     const element = containerRef.current
@@ -251,8 +267,22 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
     return () => media.removeEventListener("change", onChange)
   }, [])
 
+  // WebGL 不可用时只显示 CSS 渐变背景
+  if (!webgl) {
+    return (
+      <div className="kt-paper-shader" data-shader={shader} />
+    )
+  }
+
+  const shaderBg: Record<CardShader, string> = {
+    mesh: "#101827", neuro: "#111827", grain: "#142b2a", waves: "#17343b",
+    smoke: "#0c0e14", metaballs: "#0b1220", godRays: "#08090d", simplex: "#1a1a2e",
+    voronoi: "#1b1f3b", swirl: "#0a0a1a", warp: "#2d0a31", dotOrbit: "#0d1117"
+  }
+
   const common = {
     className: "kt-paper-shader-canvas",
+    style: { background: shaderBg[shader] },
     width: "100%",
     height: "100%",
     minPixelRatio: 1,
@@ -260,6 +290,7 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
     webGlContextAttributes: {
       alpha: false,
       antialias: false,
+      preserveDrawingBuffer: true,
       powerPreference: "low-power" as WebGLPowerPreference
     }
   }
@@ -1504,12 +1535,14 @@ function NavBtn({
   children,
   onClick,
   title,
-  active = false
+  active = false,
+  danger = false
 }: {
   children: React.ReactNode
   onClick: () => void
   title?: string
   active?: boolean
+  danger?: boolean
 }) {
   const [h, setH] = useState(false)
   return (
@@ -1526,11 +1559,15 @@ function NavBtn({
         justifyContent: "center",
         background: active
           ? "var(--accent-bg)"
-          : h
-            ? "var(--bg2)"
-            : "transparent",
-        color: active ? "var(--accent)" : h ? "var(--text)" : "var(--text3)",
-        border: `1px solid ${active ? "rgba(217,119,86,.2)" : h ? "var(--border2)" : "var(--border)"}`,
+          : danger && h
+            ? "rgba(220,38,38,.12)"
+            : h
+              ? "var(--bg2)"
+              : "transparent",
+        color: danger
+          ? h ? "#dc2626" : "#b45050"
+          : active ? "var(--accent)" : h ? "var(--text)" : "var(--text3)",
+        border: `1px solid ${active ? "rgba(217,119,86,.2)" : danger && h ? "rgba(220,38,38,.25)" : h ? "var(--border2)" : "var(--border)"}`,
         borderRadius: "var(--r-s)",
         cursor: "pointer",
         fontSize: 13,
@@ -2175,6 +2212,7 @@ function CollectionPage() {
 
   const clearAll = async () => {
     if (!confirm(`确定要删除全部 ${collections.length} 条收集记录吗？`)) return
+    if (!confirm(`二次确认：删除后无法恢复，确认清空？`)) return
     playSound("delete", soundEnabled)
     await persist([])
   }
@@ -2323,7 +2361,7 @@ function CollectionPage() {
               onChange={importData}
             />
             {!loading && collections.length > 0 && (
-              <NavBtn onClick={clearAll} title="清空全部">
+              <NavBtn onClick={clearAll} title="清空全部" danger>
                 <i className="ri-skull-line" style={{ fontSize: 14 }}></i>
               </NavBtn>
             )}

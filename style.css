@@ -603,6 +603,12 @@ html[data-theme="dark"] .kt-nav {
 .kt-paper-shader-canvas canvas {
   width: 100% !important;
   height: 100% !important;
+  background: inherit !important;
+  animation: kt-shader-fadein .5s ease both;
+}
+@keyframes kt-shader-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ── Card appearance panel ──────────────────────────────────── */
