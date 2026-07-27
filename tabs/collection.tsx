@@ -19,7 +19,7 @@ import "remixicon/fonts/remixicon.css"
 import "../contents/link-hints"
 import "../style.css"
 
-import { estimateTabTarget, playTabBeam, type Point } from "./beam"
+import { estimateTabTarget, playTabArrow, type Point } from "./beam"
 import { WEB_FONTS } from "./fonts"
 import { playScrollGear, playSound } from "./sounds"
 
@@ -690,14 +690,13 @@ function TabItem({
   const rowRef = useRef<HTMLDivElement>(null)
   const favicon = getFavicon(tab.url)
 
-  // 先读取当前行位置作为起点，再触发打开 —— onOpen 会把该标签移出收集卡、
-  // 导致此行卸载，故必须在调用前读取坐标。落点由 onOpen 异步返回。
-  const handleOpen = () => {
-    const el = rowRef.current
-    const rect = el ? el.getBoundingClientRect() : null
+  // 先读取打开按钮位置作为起点，再触发打开。链接行可能随即卸载，
+  // 箭头则由 body 覆盖层继续播放；落点由 onOpen 异步返回。
+  const handleOpen = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect()
     const result = onOpen()
     // 关闭动画时仅执行打开逻辑，不发射光束
-    if (!beamEnabled || !rect) return
+    if (!beamEnabled) return
     const origin: Point = {
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2
@@ -706,7 +705,7 @@ function TabItem({
       result && typeof (result as { then?: unknown }).then === "function"
         ? (result as Promise<Point | null>)
         : undefined
-    playTabBeam(origin, target)
+    playTabArrow(origin, target)
   }
 
   return (
