@@ -14,12 +14,14 @@ export interface Point {
 export type BeamTarget = Point | Promise<Point | null>
 
 const TARGET_TIMEOUT_MS = 240
-const CHARGE_MS = 1020
-const FLIGHT_MS = 560
+const CHARGE_MS = 520
+const FLIGHT_MS = 420
 const CLEANUP_MS = 1760
 const MAX_TAB_WIDTH = 240
 const TOP_LANDING_Y = 8
 const OVERLAY_ID = "shiye-beam-overlay"
+const CURSOR_ID = "shiye-smooth-cursor"
+const CURSOR_STYLE_ID = "shiye-smooth-cursor-style"
 
 function themeColor(): string {
   try {
@@ -38,6 +40,164 @@ function prefersReducedMotion(): boolean {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches
   } catch {
     return false
+  }
+}
+
+export function initSmoothCursor(): () => void {
+  if (
+    window.matchMedia("(pointer: coarse)").matches ||
+    document.getElementById(CURSOR_ID)
+  )
+    return () => {}
+
+  const style = document.createElement("style")
+  style.id = CURSOR_STYLE_ID
+  style.textContent = `
+    html.shiye-has-smooth-cursor,
+    html.shiye-has-smooth-cursor * { cursor: none !important; }
+    #${CURSOR_ID} {
+      position: fixed; z-index: 2147483647; top: 0; left: 0;
+      opacity: 0; pointer-events: none; transform-origin: 12.5px 2.5px;
+      transition: opacity .25s; will-change: transform;
+    }
+    #${CURSOR_ID} svg {
+      position: absolute; top: 0; left: 0; display: block;
+      transform-origin: 12.5px 2.5px;
+      transition: opacity .16s, transform .22s cubic-bezier(.22,1,.36,1);
+    }
+    #${CURSOR_ID} .cursor-hand {
+      opacity: 0; transform: scale(.72) rotate(-12deg);
+    }
+    #${CURSOR_ID}.is-hand .cursor-arrow {
+      opacity: 0; transform: scale(.72) rotate(12deg);
+    }
+    #${CURSOR_ID}.is-hand .cursor-hand {
+      opacity: 1; transform: scale(1);
+    }
+  `
+
+  const cursor = document.createElement("div")
+  cursor.id = CURSOR_ID
+  cursor.setAttribute("aria-hidden", "true")
+  cursor.innerHTML = `
+    <svg class="cursor-arrow" width="25" height="27" viewBox="0 0 50 54" fill="none">
+      <path d="M42.6817 41.1495 27.5103 6.79925c-.7834-1.77368-3.3021-1.77367-4.1176 0L7.59814 41.1495c-.83981 1.8264.92898 3.7407 2.81436 3.0459l13.9632-5.1458a2.27 2.27 0 0 1 1.5665 0l13.8699 5.1458c1.8728.6948 3.6763-1.2195 2.8696-3.0459Z" fill="var(--bg)" stroke="var(--text)" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <svg class="cursor-hand" width="27" height="27" viewBox="0 0 54 54" fill="none">
+      <path d="M20.5 31V10.5C20.5 6.5 23 4 26 4s5.5 2.5 5.5 6.5V22v-7c0-3.5 2.5-5.5 5.5-5.5s5 2.5 5 6V24v-6c0-3.5 2.5-5.5 5.5-5.5s4 2.5 4 6V33c0 12-8.5 19-19.5 19h-4c-6.5 0-11-3.5-15-8l-8.5-9.5C1.5 31 2 27.5 4.5 25s6-.5 8.5 2l7.5 8Z" fill="var(--bg)" stroke="var(--text)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `
+
+  let cursorFrame = 0
+  let targetX = window.innerWidth / 2
+  let targetY = window.innerHeight / 2
+  let x = targetX
+  let y = targetY
+  let velocityX = 0
+  let velocityY = 0
+  let rotation = 0
+  let rotationVelocity = 0
+  let targetRotation = 0
+  let verticalScale = 1
+  let started = false
+  let previousTime = performance.now()
+  const reducedMotion = prefersReducedMotion()
+
+  const onPointerMove = (event: PointerEvent) => {
+    targetX = event.clientX
+    targetY = event.clientY
+    if (!started) {
+      started = true
+      x = targetX
+      y = targetY
+      cursor.style.opacity = "1"
+    }
+  }
+
+  const updateHand = (target: EventTarget | null) => {
+    const element = target instanceof Element ? target : null
+    cursor.classList.toggle(
+      "is-hand",
+      Boolean(element?.closest("a, button, [data-clickable], [role='button']"))
+    )
+  }
+  const onPointerOver = (event: PointerEvent) => updateHand(event.target)
+  const onPointerOut = (event: PointerEvent) =>
+    updateHand(event.relatedTarget)
+
+  const onPointerLeave = () => {
+    cursor.style.opacity = "0"
+  }
+  const onPointerEnter = () => {
+    if (started) cursor.style.opacity = "1"
+  }
+
+  const shortestAngleDelta = (from: number, to: number) => {
+    let delta = (to - from) % 360
+    if (delta > 180) delta -= 360
+    if (delta < -180) delta += 360
+    return delta
+  }
+
+  const animateCursor = (time: number) => {
+    const delta = Math.min((time - previousTime) / 1000, 1 / 30)
+    previousTime = time
+    if (reducedMotion) {
+      x = targetX
+      y = targetY
+    } else {
+      const steps = Math.max(1, Math.ceil(delta / (1 / 360)))
+      const step = delta / steps
+      if (Math.hypot(velocityX, velocityY) > 35) {
+        const angle = (Math.atan2(velocityY, velocityX) * 180) / Math.PI + 90
+        targetRotation = rotation + shortestAngleDelta(rotation, angle)
+      }
+      for (let index = 0; index < steps; index += 1) {
+        const accelerationX = 2800 * (targetX - x) - 106 * velocityX
+        const accelerationY = 2800 * (targetY - y) - 106 * velocityY
+        velocityX += accelerationX * step
+        velocityY += accelerationY * step
+        x += velocityX * step
+        y += velocityY * step
+        const rotationAcceleration =
+          1800 * (targetRotation - rotation) - 85 * rotationVelocity
+        rotationVelocity += rotationAcceleration * step
+        rotation += rotationVelocity * step
+      }
+    }
+    const deformation = reducedMotion
+      ? 0
+      : Math.min(Math.hypot(velocityX, velocityY) / 4200, 0.32)
+    verticalScale +=
+      (1 + deformation - verticalScale) * (1 - Math.exp(-14 * delta))
+    const cursorSize = 0.77
+    cursor.style.transform =
+      `translate3d(${x - 12.5}px,${y - 2.5}px,0) ` +
+      `rotate(${rotation}deg) ` +
+      `scale(${cursorSize * (1 - 0.42 * deformation)},${cursorSize * verticalScale})`
+    cursorFrame = requestAnimationFrame(animateCursor)
+  }
+
+  document.head.appendChild(style)
+  document.body.appendChild(cursor)
+  document.documentElement.classList.add("shiye-has-smooth-cursor")
+  window.addEventListener("pointermove", onPointerMove)
+  document.addEventListener("pointerover", onPointerOver)
+  document.addEventListener("pointerout", onPointerOut)
+  document.addEventListener("mouseleave", onPointerLeave)
+  document.addEventListener("mouseenter", onPointerEnter)
+  cursorFrame = requestAnimationFrame(animateCursor)
+
+  return () => {
+    cancelAnimationFrame(cursorFrame)
+    window.removeEventListener("pointermove", onPointerMove)
+    document.removeEventListener("pointerover", onPointerOver)
+    document.removeEventListener("pointerout", onPointerOut)
+    document.removeEventListener("mouseleave", onPointerLeave)
+    document.removeEventListener("mouseenter", onPointerEnter)
+    document.documentElement.classList.remove("shiye-has-smooth-cursor")
+    cursor.remove()
+    style.remove()
   }
 }
 
@@ -87,9 +247,9 @@ function createArrow(overlay: HTMLElement, origin: Point, color: string) {
   const arrow = document.createElement("span")
   arrow.setAttribute("aria-hidden", "true")
   arrow.innerHTML =
-    '<svg width="28" height="13" viewBox="0 0 28 13" fill="none"><path d="M1 6.5h24" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M21 3 25 6.5 21 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    '<svg width="26" height="16" viewBox="0 0 24 18"><path d="M3 6.6h10V3.75c0-1.34 1.57-2.06 2.58-1.18l6.24 5.42c.62.54.62 1.48 0 2.02l-6.24 5.42c-1.01.88-2.58.16-2.58-1.18V11.4H3a2.4 2.4 0 1 1 0-4.8Z" fill="currentColor"/></svg>'
   arrow.style.cssText =
-    `position:fixed;left:${origin.x - 14}px;top:${origin.y - 6.5}px;` +
+    `position:fixed;left:${origin.x - 13}px;top:${origin.y - 8}px;` +
     `display:inline-flex;color:${color};will-change:transform;`
   overlay.appendChild(arrow)
   return arrow
@@ -212,11 +372,18 @@ function fire(
     const length = Math.max(1, Math.hypot(tangent.x, tangent.y))
     const directionX = tangent.x / length
     const directionY = tangent.y / length
-    const angle = (Math.atan2(tangent.y, tangent.x) * 180) / Math.PI
+    const tangentAngle = (Math.atan2(tangent.y, tangent.x) * 180) / Math.PI
+    const turnProgress = Math.min(1, Math.max(0, (raw - 0.68) / 0.32))
+    const smoothTurn = turnProgress * turnProgress * (3 - 2 * turnProgress)
+    const angleDelta = ((-90 - tangentAngle + 540) % 360) - 180
+    const angle = tangentAngle + angleDelta * smoothTurn
+    const fadeProgress = Math.min(1, Math.max(0, (raw - 0.55) / 0.45))
+    const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
 
     arrow.style.transform =
       `translate3d(${point.x - origin.x}px,${point.y - origin.y}px,0) ` +
       `rotate(${angle}deg)`
+    arrow.style.opacity = String(1 - smoothFade)
 
     if (raw < 0.9) {
       emission += 420 * delta

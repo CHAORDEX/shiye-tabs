@@ -19,7 +19,12 @@ import "remixicon/fonts/remixicon.css"
 import "../contents/link-hints"
 import "../style.css"
 
-import { estimateTabTarget, playTabArrow, type Point } from "./beam"
+import {
+  estimateTabTarget,
+  initSmoothCursor,
+  playTabArrow,
+  type Point
+} from "./beam"
 import { WEB_FONTS } from "./fonts"
 import { playScrollGear, playSound } from "./sounds"
 
@@ -91,6 +96,7 @@ const THEME_KEY = "shiye-theme"
 const FONT_SCALE_KEY = "shiye-font-scale"
 const FONT_WEIGHT_KEY = "shiye-font-weight"
 const BEAM_KEY = "shiye-beam-enabled"
+const CURSOR_KEY = "shiye-cursor-enabled"
 const SOUND_KEY = "shiye-sound-enabled"
 const COLLECT_MODE_KEY = "shiye-collect-mode"
 const WINDOW_COLUMNS_KEY = "shiye-window-columns"
@@ -138,6 +144,7 @@ const CARD_SHADERS: Array<{
 
 /** 打开标签时的光束动画默认开启 */
 const BEAM_DEFAULT = true
+const CURSOR_DEFAULT = true
 const SOUND_DEFAULT = true
 
 /* 内容字号缩放系数范围 */
@@ -690,15 +697,18 @@ function TabItem({
   const rowRef = useRef<HTMLDivElement>(null)
   const favicon = getFavicon(tab.url)
 
-  // 先读取打开按钮位置作为起点，再触发打开。链接行可能随即卸载，
+  // 先读取关闭按钮位置，再从其右侧发射箭头。链接行可能随即卸载，
   // 箭头则由 body 覆盖层继续播放；落点由 onOpen 异步返回。
   const handleOpen = (event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect()
+    const closeButton = rowRef.current?.querySelector<HTMLButtonElement>(
+      "button:last-child"
+    )
+    const rect = (closeButton ?? event.currentTarget).getBoundingClientRect()
     const result = onOpen()
     // 关闭动画时仅执行打开逻辑，不发射光束
     if (!beamEnabled) return
     const origin: Point = {
-      x: rect.left + rect.width / 2,
+      x: rect.right + 13,
       y: rect.top + rect.height / 2
     }
     const target =
@@ -1818,6 +1828,7 @@ function CollectionPage() {
   const [showFontPanel, setShowFontPanel] = useState(false)
   const [theme, setTheme] = useState<Theme>("auto")
   const [beamEnabled, setBeamEnabled] = useState(BEAM_DEFAULT)
+  const [cursorEnabled, setCursorEnabled] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(SOUND_DEFAULT)
   const [collectMode, setCollectMode] = useState<CollectMode>("all")
   const [windowColumns, setWindowColumns] = useState(WINDOW_COLUMNS_DEFAULT)
@@ -1834,6 +1845,11 @@ function CollectionPage() {
   const isDark = theme === "dark" || (theme === "auto" && systemIsDark())
   const pageMaxWidth = windowColumns * 500 + (windowColumns - 1) * 12
 
+  useEffect(() => {
+    if (!cursorEnabled) return
+    return initSmoothCursor()
+  }, [cursorEnabled])
+
   /* ── Boot ── */
   useEffect(() => {
     chrome.storage.local
@@ -1844,6 +1860,7 @@ function CollectionPage() {
         FONT_SCALE_KEY,
         FONT_WEIGHT_KEY,
         BEAM_KEY,
+        CURSOR_KEY,
         SOUND_KEY,
         COLLECT_MODE_KEY,
         WINDOW_COLUMNS_KEY,
@@ -1882,6 +1899,11 @@ function CollectionPage() {
           applyTheme(t)
         }
         if (typeof r[BEAM_KEY] === "boolean") setBeamEnabled(r[BEAM_KEY])
+        setCursorEnabled(
+          typeof r[CURSOR_KEY] === "boolean"
+            ? r[CURSOR_KEY]
+            : CURSOR_DEFAULT
+        )
         if (typeof r[SOUND_KEY] === "boolean") setSoundEnabled(r[SOUND_KEY])
         if (r[COLLECT_MODE_KEY] === "all" || r[COLLECT_MODE_KEY] === "current")
           setCollectMode(r[COLLECT_MODE_KEY])
@@ -1896,6 +1918,7 @@ function CollectionPage() {
       })
       .catch((err) => {
         console.error("[拾页] 异步数据解包异常:", err)
+        setCursorEnabled(CURSOR_DEFAULT)
       })
       .finally(() => {
         setLoading(false)
@@ -1958,6 +1981,13 @@ function CollectionPage() {
     playSound("toggle", soundEnabled)
     setBeamEnabled(next)
     await chrome.storage.local.set({ [BEAM_KEY]: next })
+  }
+
+  const toggleCursor = async () => {
+    const next = !cursorEnabled
+    playSound("toggle", soundEnabled)
+    setCursorEnabled(next)
+    await chrome.storage.local.set({ [CURSOR_KEY]: next })
   }
 
   const toggleSound = async () => {
@@ -2424,6 +2454,15 @@ function CollectionPage() {
               <i
                 className={
                   beamEnabled ? "ri-flashlight-fill" : "ri-flashlight-line"
+                }></i>
+            </NavBtn>
+            <NavBtn
+              onClick={toggleCursor}
+              title={cursorEnabled ? "关闭自定义鼠标" : "开启自定义鼠标"}
+              active={cursorEnabled}>
+              <i
+                className={
+                  cursorEnabled ? "ri-cursor-fill" : "ri-cursor-line"
                 }></i>
             </NavBtn>
             <NavBtn
