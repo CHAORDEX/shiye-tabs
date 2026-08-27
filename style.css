@@ -290,6 +290,75 @@ html[data-theme="dark"] .kt-nav {
   border-bottom-right-radius: calc(var(--r) - 1px);
   backdrop-filter: blur(14px) saturate(1.08);
   -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  transition: filter var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.kt-collection-card.is-blurred .kt-card-list {
+  filter: blur(9px);
+  opacity: 0.38;
+  user-select: none;
+  pointer-events: none;
+}
+.kt-card-badge-btn {
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 1px 6px;
+  margin: -1px -6px;
+  border-radius: var(--r-s);
+  border: 1px solid transparent;
+  transition: all var(--dur) var(--ease);
+}
+.kt-card-badge-btn:hover {
+  background: var(--bg3);
+  color: var(--text);
+  border-color: var(--border);
+}
+.kt-card-badge-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: rgba(217, 119, 86, 0.25);
+}
+.kt-card-blur-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  animation: kt-fade-in var(--dur) var(--ease);
+}
+.kt-card-blur-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-m);
+  color: var(--text2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.kt-card-blur-overlay:hover .kt-card-blur-chip {
+  transform: scale(1.03);
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: var(--shadow-l);
+}
+@keyframes kt-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .kt-merge-menu {
   background: var(--card);

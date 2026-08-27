@@ -685,6 +685,35 @@ function IconBtn({
   )
 }
 
+const MASKED_TITLES = [
+  "Q3季度技术方案重构与性能评估报告",
+  "分布式系统高可用架构设计与实践",
+  "2024年度核心业务指标与数据看板",
+  "前端工程化规范与构建优化指引",
+  "团队工作周报与下阶段里程碑规划",
+  "微服务鉴权体系与安全合规规范",
+  "产品需求规格说明书 (PRD) 终稿",
+  "API 接口设计规范与统一错误码清单",
+  "DevOps 自动化部署与监控告警指南",
+  "关于数据库索引优化与慢查询调优",
+  "代码重构与整洁架构实战分享",
+  "现代设计系统与组件库规范文档",
+  "跨端跨平台架构方案调研分析",
+  "项目复盘总结与风险应对预案",
+  "网络安全基线检查与加固指南",
+  "深入理解并发编程与异步事件模型",
+  "每日精选行业技术动态与资讯简报",
+  "敏捷研发流程与项目协同最佳实践",
+  "云原生容器化集群运维与调优手册",
+  "知识库文档：常见问题排查手册"
+]
+
+function getRandomMaskedTitle(currentTitle?: string): string {
+  const filtered = MASKED_TITLES.filter((t) => t !== currentTitle)
+  const pool = filtered.length > 0 ? filtered : MASKED_TITLES
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
 /* ── TabItem — compact grid cell ────────────────────────────── */
 function TabItem({
   tab,
@@ -713,6 +742,7 @@ function TabItem({
 }) {
   const [h, setH] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [maskedTitle, setMaskedTitle] = useState<string | null>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const favicon = getFavicon(tab.url)
 
@@ -740,7 +770,7 @@ function TabItem({
   return (
     <div
       ref={rowRef}
-      title={tab.url}
+      title={maskedTitle ? "（真实标题已隐藏）" : tab.url}
       draggable
       onDragStart={onDragStart}
       onDragEnd={() => {
@@ -815,24 +845,43 @@ function TabItem({
           minWidth: 0,
           fontSize: fs(14),
           fontWeight: "var(--fw)",
-          color: "var(--text)",
+          color: maskedTitle ? "var(--text2)" : "var(--text)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
           lineHeight: 1.4
         }}>
-        {tab.title}
+        {maskedTitle ?? tab.title}
       </span>
 
-      {/* Actions — visible on row hover or when locked */}
+      {/* Actions — visible on row hover or when locked/masked */}
       <div
         style={{
           display: "flex",
           gap: 2,
           flexShrink: 0,
-          opacity: tab.locked ? 1 : h ? 1 : 0,
+          opacity: tab.locked || maskedTitle ? 1 : h ? 1 : 0,
           transition: "opacity var(--dur) var(--ease)"
         }}>
+        <IconBtn
+          onClick={(e) => {
+            e.stopPropagation()
+            if (maskedTitle) {
+              setMaskedTitle(null)
+            } else {
+              setMaskedTitle(getRandomMaskedTitle(tab.title))
+            }
+          }}
+          title={maskedTitle ? "恢复真实标题" : "随机改写标题（隐藏真实标题）"}
+          accent={Boolean(maskedTitle)}>
+          <i
+            className={maskedTitle ? "ri-magic-fill" : "ri-magic-line"}
+            style={{
+              fontSize: 12,
+              color: maskedTitle ? "var(--accent)" : undefined
+            }}
+          />
+        </IconBtn>
         <IconBtn
           onClick={(e) => {
             e.stopPropagation()
@@ -911,6 +960,7 @@ function CollectionCard({
   onToggleTabLock: (tabIndex: number) => void
 }) {
   const [hCard, setHCard] = useState(false)
+  const [isBlurred, setIsBlurred] = useState(false)
   const [showMergeMenu, setShowMergeMenu] = useState(false)
   const [showGatherMenu, setShowGatherMenu] = useState(false)
   const [showAppearancePanel, setShowAppearancePanel] = useState(false)
@@ -1013,7 +1063,7 @@ function CollectionCard({
 
   return (
     <div
-      className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}`}
+      className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}${isBlurred ? " is-blurred" : ""}`}
       data-card-style={appearanceMode === "theme" ? cardStyle : undefined}
       data-card-mode={appearanceMode}
       onMouseEnter={() => setHCard(true)}
@@ -1065,11 +1115,17 @@ function CollectionCard({
             overflow: "hidden"
           }}>
           <span
+            className={`kt-card-badge-btn${isBlurred ? " active" : ""}`}
+            onClick={() => setIsBlurred((v) => !v)}
+            title={isBlurred ? "点击恢复显示（退出隐私模式）" : "点击模糊卡片（隐私保护）"}
             style={{
               fontSize: fs(12),
               fontWeight: "var(--fw)",
-              color: "var(--text3)"
+              color: isBlurred ? "var(--accent)" : "var(--text3)"
             }}>
+            {isBlurred && (
+              <i className="ri-eye-off-line" style={{ fontSize: fs(12) }} />
+            )}
             {collection.tabs?.length || 0} 个标签页
           </span>
           <span
@@ -1080,7 +1136,10 @@ function CollectionCard({
               letterSpacing: "-.01em",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
+              whiteSpace: "nowrap",
+              filter: isBlurred ? "blur(5px)" : "none",
+              userSelect: isBlurred ? "none" : undefined,
+              transition: "filter var(--dur) var(--ease)"
             }}>
             {(() => {
               const t = collection.tabs?.[0]?.title || "";
@@ -1572,36 +1631,56 @@ function CollectionCard({
       </div>
 
       {/* ── Tab list ── */}
-      <div
-        className="kt-card-list"
-        onDragOver={(e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = "move"
-        }}
-        onDrop={(e) => onTabDrop(collection.id, (collection.tabs?.length || 0), e)}
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${linkColumns}, minmax(0, 1fr))`,
-          gap: 2,
-          padding: "8px 8px"
-        }}>
-        {(collection.tabs || []).map((tab, index) => (
-          <TabItem
-            key={`${tab.url}-${index}`}
-            tab={tab}
-            beamEnabled={beamEnabled}
-            soundEnabled={soundEnabled}
-            dragging={
-              draggingTab?.colId === collection.id && draggingTab.index === index
-            }
-            onOpen={() => onOpenTab(tab.url, index)}
-            onDelete={() => onDeleteTab(index)}
-            onToggleLock={() => onToggleTabLock(index)}
-            onDragStart={(e) => onTabDragStart(collection.id, index, e)}
-            onDragEnd={onTabDragEnd}
-            onDrop={(e) => onTabDrop(collection.id, index, e)}
-          />
-        ))}
+      <div style={{ position: "relative" }}>
+        <div
+          className="kt-card-list"
+          onDragOver={(e) => {
+            if (isBlurred) return
+            e.preventDefault()
+            e.dataTransfer.dropEffect = "move"
+          }}
+          onDrop={(e) => {
+            if (isBlurred) return
+            onTabDrop(collection.id, (collection.tabs?.length || 0), e)
+          }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${linkColumns}, minmax(0, 1fr))`,
+            gap: 2,
+            padding: "8px 8px"
+          }}>
+          {(collection.tabs || []).map((tab, index) => (
+            <TabItem
+              key={`${tab.url}-${index}`}
+              tab={tab}
+              beamEnabled={beamEnabled}
+              soundEnabled={soundEnabled}
+              dragging={
+                draggingTab?.colId === collection.id && draggingTab.index === index
+              }
+              onOpen={() => onOpenTab(tab.url, index)}
+              onDelete={() => onDeleteTab(index)}
+              onToggleLock={() => onToggleTabLock(index)}
+              onDragStart={(e) => onTabDragStart(collection.id, index, e)}
+              onDragEnd={onTabDragEnd}
+              onDrop={(e) => onTabDrop(collection.id, index, e)}
+            />
+          ))}
+        </div>
+        {isBlurred && (
+          <div
+            className="kt-card-blur-overlay"
+            onClick={() => setIsBlurred(false)}
+            title="点击恢复显示">
+            <div className="kt-card-blur-chip" style={{ fontSize: fs(12) }}>
+              <i
+                className="ri-eye-off-line"
+                style={{ fontSize: fs(14), color: "var(--accent)" }}
+              />
+              <span>已开启隐私模糊 · 点击恢复</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
