@@ -1191,7 +1191,7 @@ function CollectionCard({
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "nowrap",
-          padding: "12px 16px",
+          padding: "10px 14px",
           borderBottom: "1px solid var(--border)",
           gap: 8,
           borderTopLeftRadius: "calc(var(--r) - 1px)",
@@ -1200,8 +1200,7 @@ function CollectionCard({
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: 4,
+            alignItems: "center",
             flex: "1 1 auto",
             minWidth: 0,
             overflow: "hidden"
@@ -1211,32 +1210,14 @@ function CollectionCard({
             onClick={() => setIsBlurred((v) => !v)}
             title={isBlurred ? "点击恢复显示（退出隐私模式）" : "点击模糊卡片（隐私保护）"}
             style={{
-              fontSize: fs(12),
-              fontWeight: "var(--fw)",
-              color: isBlurred ? "var(--accent)" : "var(--text3)"
+              fontSize: fs(13),
+              fontWeight: "var(--fw-medium, 500)",
+              color: isBlurred ? "var(--accent)" : "var(--text2)"
             }}>
             {isBlurred && (
-              <i className="ri-eye-off-line" style={{ fontSize: fs(12) }} />
+              <i className="ri-eye-off-line" style={{ fontSize: fs(13) }} />
             )}
-            {collection.tabs?.length || 0} 个标签页
-          </span>
-          <span
-            style={{
-              fontSize: fs(14.5),
-              fontWeight: "var(--fw-strong)",
-              color: "var(--text)",
-              letterSpacing: "-.01em",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              filter: isBlurred ? "blur(5px)" : "none",
-              userSelect: isBlurred ? "none" : undefined,
-              transition: "filter var(--dur) var(--ease)"
-            }}>
-            {(() => {
-              const t = collection.tabs?.[0]?.title || "";
-              return t.length > 7 ? t.slice(0, 7) + "…" : t;
-            })()}
+            {collection.tabs?.length || 0} 个标签
           </span>
         </div>
 
