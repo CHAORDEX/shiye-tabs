@@ -43,6 +43,7 @@ interface TabInfo {
   title: string
   url: string
   locked?: boolean
+  maskedTitle?: string
 }
 
 interface Collection {
@@ -120,6 +121,7 @@ const SOUND_KEY = "shiye-sound-enabled"
 const COLLECT_MODE_KEY = "shiye-collect-mode"
 const WINDOW_COLUMNS_KEY = "shiye-window-columns"
 const COLLECTION_COLUMNS_KEY = "shiye-collection-columns"
+const COLLECTION_SPANS_KEY = "shiye-collection-spans"
 const TAB_DRAG_MIME = "application/x-shiye-tab"
 type CollectMode = "all" | "current"
 
@@ -723,6 +725,7 @@ function TabItem({
   onOpen,
   onDelete,
   onToggleLock,
+  onToggleMaskTitle,
   onDragStart,
   onDragEnd,
   onDrop
@@ -736,15 +739,17 @@ function TabItem({
   onOpen: () => Promise<Point | null> | void
   onDelete: () => void
   onToggleLock: () => void
+  onToggleMaskTitle: () => void
   onDragStart: (e: React.DragEvent) => void
   onDragEnd: () => void
   onDrop: (e: React.DragEvent) => void
 }) {
   const [h, setH] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const [maskedTitle, setMaskedTitle] = useState<string | null>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const favicon = getFavicon(tab.url)
+  const isMasked = Boolean(tab.maskedTitle)
+  const displayTitle = tab.maskedTitle ?? tab.title
 
   // 先读取关闭按钮位置，再从其右侧发射箭头。链接行可能随即卸载，
   // 箭头则由 body 覆盖层继续播放；落点由 onOpen 异步返回。
@@ -770,7 +775,7 @@ function TabItem({
   return (
     <div
       ref={rowRef}
-      title={maskedTitle ? "（真实标题已隐藏）" : tab.url}
+      title={isMasked ? "（真实标题已隐藏）" : tab.url}
       draggable
       onDragStart={onDragStart}
       onDragEnd={() => {
@@ -845,13 +850,13 @@ function TabItem({
           minWidth: 0,
           fontSize: fs(14),
           fontWeight: "var(--fw)",
-          color: maskedTitle ? "var(--text2)" : "var(--text)",
+          color: isMasked ? "var(--text2)" : "var(--text)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
           lineHeight: 1.4
         }}>
-        {maskedTitle ?? tab.title}
+        {displayTitle}
       </span>
 
       {/* Actions — visible on row hover or when locked/masked */}
@@ -860,25 +865,21 @@ function TabItem({
           display: "flex",
           gap: 2,
           flexShrink: 0,
-          opacity: tab.locked || maskedTitle ? 1 : h ? 1 : 0,
+          opacity: tab.locked || isMasked ? 1 : h ? 1 : 0,
           transition: "opacity var(--dur) var(--ease)"
         }}>
         <IconBtn
           onClick={(e) => {
             e.stopPropagation()
-            if (maskedTitle) {
-              setMaskedTitle(null)
-            } else {
-              setMaskedTitle(getRandomMaskedTitle(tab.title))
-            }
+            onToggleMaskTitle()
           }}
-          title={maskedTitle ? "恢复真实标题" : "随机改写标题（隐藏真实标题）"}
-          accent={Boolean(maskedTitle)}>
+          title={isMasked ? "恢复真实标题" : "随机改写标题（隐藏真实标题）"}
+          accent={isMasked}>
           <i
-            className={maskedTitle ? "ri-magic-fill" : "ri-magic-line"}
+            className={isMasked ? "ri-magic-fill" : "ri-magic-line"}
             style={{
               fontSize: 12,
-              color: maskedTitle ? "var(--accent)" : undefined
+              color: isMasked ? "var(--accent)" : undefined
             }}
           />
         </IconBtn>
@@ -916,6 +917,10 @@ function CollectionCard({
   splitAnimating,
   draggingTab,
   linkColumns,
+  currentSpan,
+  maxSpan,
+  onResizeSpan,
+  onResetSpan,
   onOpenAll,
   onOpenTab,
   onDeleteTab,
@@ -930,7 +935,8 @@ function CollectionCard({
   onMergeTo,
   onAppearanceChange,
   onToggleLock,
-  onToggleTabLock
+  onToggleTabLock,
+  onToggleTabMaskTitle
 }: {
   collection: Collection
   otherCollections: Collection[]
@@ -939,6 +945,10 @@ function CollectionCard({
   splitAnimating: boolean
   draggingTab: DraggedTab | null
   linkColumns: number
+  currentSpan: number
+  maxSpan: number
+  onResizeSpan: (newSpan: number) => void
+  onResetSpan: () => void
   onOpenAll: () => void
   onOpenTab: (url: string, index: number) => Promise<Point | null> | void
   onDeleteTab: (index: number) => void
@@ -958,12 +968,14 @@ function CollectionCard({
   onAppearanceChange: (appearance: CardAppearanceUpdate) => Promise<void>
   onToggleLock: () => void
   onToggleTabLock: (tabIndex: number) => void
+  onToggleTabMaskTitle: (tabIndex: number) => void
 }) {
   const [hCard, setHCard] = useState(false)
   const [isBlurred, setIsBlurred] = useState(false)
   const [showMergeMenu, setShowMergeMenu] = useState(false)
   const [showGatherMenu, setShowGatherMenu] = useState(false)
   const [showAppearancePanel, setShowAppearancePanel] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
   const [backgroundDraft, setBackgroundDraft] = useState(() =>
     collection.backgroundImage?.startsWith("data:")
       ? ""
@@ -1052,6 +1064,8 @@ function CollectionCard({
     }
   }
 
+  const [isResizing, setIsResizing] = useState(false)
+  const [liveSpan, setLiveSpan] = useState<number | null>(null)
   const cardStyle = collection.cardStyle ?? "classic"
   const hasCustomBackground = Boolean(collection.backgroundImage)
   const cardShader = normalizeCardShader(collection.cardShader)
@@ -1061,9 +1075,87 @@ function CollectionCard({
       ? "image"
       : "theme"
 
+  const handleCornerMouseDown = (
+    e: React.MouseEvent,
+    corner: "tl" | "tr" | "bl" | "br"
+  ) => {
+    if (maxSpan <= 1) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const cardEl = cardRef.current
+    if (!cardEl) return
+    const cardRect = cardEl.getBoundingClientRect()
+    const parentWidth =
+      cardEl.parentElement?.parentElement?.getBoundingClientRect().width ||
+      cardRect.width
+    const calculatedColWidth = (parentWidth - (maxSpan - 1) * 12) / maxSpan
+    const colWidth =
+      calculatedColWidth > 60
+        ? calculatedColWidth
+        : cardRect.width / Math.max(1, currentSpan)
+    const initialWidth = cardRect.width
+    const initialSpan = currentSpan
+    let lastAppliedSpan = initialSpan
+
+    setIsResizing(true)
+    setLiveSpan(initialSpan)
+    const cursorStyle =
+      corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize"
+    const prevCursor = document.body.style.cursor
+    const prevUserSelect = document.body.style.userSelect
+    document.body.style.cursor = cursorStyle
+    document.body.style.userSelect = "none"
+
+    const handleMouseMove = (moveEvt: MouseEvent) => {
+      const deltaX =
+        corner === "tr" || corner === "br"
+          ? moveEvt.clientX - startX
+          : startX - moveEvt.clientX
+
+      const deltaY =
+        corner === "bl" || corner === "br"
+          ? moveEvt.clientY - startY
+          : startY - moveEvt.clientY
+
+      const delta = Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : deltaY
+      const targetWidth = initialWidth + delta
+      const rawSpan = Math.round((targetWidth + 12) / (colWidth + 12))
+      // 范围：最小1列，最大总列数 maxSpan
+      const targetSpan = Math.max(1, Math.min(maxSpan, rawSpan))
+
+      if (targetSpan !== lastAppliedSpan) {
+        lastAppliedSpan = targetSpan
+        setLiveSpan(targetSpan)
+        onResizeSpan(targetSpan)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      setLiveSpan(null)
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevUserSelect
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
+  const handleCornerDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onResetSpan()
+  }
+
   return (
     <div
-      className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}${isBlurred ? " is-blurred" : ""}`}
+      ref={cardRef}
+      className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}${isBlurred ? " is-blurred" : ""}${isResizing ? " is-resizing" : ""}`}
       data-card-style={appearanceMode === "theme" ? cardStyle : undefined}
       data-card-mode={appearanceMode}
       onMouseEnter={() => setHCard(true)}
@@ -1661,6 +1753,7 @@ function CollectionCard({
               onOpen={() => onOpenTab(tab.url, index)}
               onDelete={() => onDeleteTab(index)}
               onToggleLock={() => onToggleTabLock(index)}
+              onToggleMaskTitle={() => onToggleTabMaskTitle(index)}
               onDragStart={(e) => onTabDragStart(collection.id, index, e)}
               onDragEnd={onTabDragEnd}
               onDrop={(e) => onTabDrop(collection.id, index, e)}
@@ -1682,6 +1775,59 @@ function CollectionCard({
           </div>
         )}
       </div>
+
+      {/* ── Resize HUD indicator ── */}
+      {isResizing && (
+        <div className="kt-card-resize-hud" aria-live="polite">
+          <div className="kt-hud-slots">
+            {Array.from({ length: maxSpan }).map((_, i) => (
+              <div
+                key={i}
+                className={`kt-hud-slot${i < (liveSpan ?? currentSpan) ? " active" : ""}`}
+              />
+            ))}
+          </div>
+          <div className="kt-hud-text">
+            <span className="kt-hud-val">{liveSpan ?? currentSpan} 列</span>
+            {(liveSpan ?? currentSpan) === maxSpan && (
+              <span className="kt-hud-tag max">最大</span>
+            )}
+            {(liveSpan ?? currentSpan) === 1 && (
+              <span className="kt-hud-tag min">最小</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Corner resize handles ── */}
+      {maxSpan > 1 && (
+        <>
+          <div
+            className="kt-card-corner-handle kt-card-corner-tl"
+            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
+            onMouseDown={(e) => handleCornerMouseDown(e, "tl")}
+            onDoubleClick={handleCornerDoubleClick}
+          />
+          <div
+            className="kt-card-corner-handle kt-card-corner-tr"
+            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
+            onMouseDown={(e) => handleCornerMouseDown(e, "tr")}
+            onDoubleClick={handleCornerDoubleClick}
+          />
+          <div
+            className="kt-card-corner-handle kt-card-corner-bl"
+            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
+            onMouseDown={(e) => handleCornerMouseDown(e, "bl")}
+            onDoubleClick={handleCornerDoubleClick}
+          />
+          <div
+            className="kt-card-corner-handle kt-card-corner-br"
+            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
+            onMouseDown={(e) => handleCornerMouseDown(e, "br")}
+            onDoubleClick={handleCornerDoubleClick}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -1942,6 +2088,9 @@ function CollectionPage() {
   const [collectionColumns, setCollectionColumns] = useState<
     Record<string, number>
   >({})
+  const [collectionSpans, setCollectionSpans] = useState<
+    Record<string, number>
+  >({})
   const [splitAnimatingIds, setSplitAnimatingIds] = useState<Set<string>>(
     () => new Set()
   )
@@ -1971,7 +2120,8 @@ function CollectionPage() {
         SOUND_KEY,
         COLLECT_MODE_KEY,
         WINDOW_COLUMNS_KEY,
-        COLLECTION_COLUMNS_KEY
+        COLLECTION_COLUMNS_KEY,
+        COLLECTION_SPANS_KEY
       ])
       .then((r) => {
         if (r.collections && Array.isArray(r.collections)) {
@@ -2022,6 +2172,12 @@ function CollectionPage() {
           r[COLLECTION_COLUMNS_KEY] !== null
         )
           setCollectionColumns(r[COLLECTION_COLUMNS_KEY])
+        if (
+          r[COLLECTION_SPANS_KEY] &&
+          typeof r[COLLECTION_SPANS_KEY] === "object" &&
+          r[COLLECTION_SPANS_KEY] !== null
+        )
+          setCollectionSpans(r[COLLECTION_SPANS_KEY])
       })
       .catch((err) => {
         console.error("[拾页] 异步数据解包异常:", err)
@@ -2132,6 +2288,22 @@ function CollectionPage() {
     playSound("toggle", soundEnabled)
     setCollectionColumns(updated)
     await chrome.storage.local.set({ [COLLECTION_COLUMNS_KEY]: updated })
+  }
+
+  const getCollectionSpan = (id: string) => {
+    return Math.max(1, collectionSpans?.[id] || 1)
+  }
+
+  const updateCollectionSpan = async (id: string, span: number) => {
+    const safeSpans = { ...(collectionSpans || {}) }
+    if (span <= 1) {
+      delete safeSpans[id]
+    } else {
+      safeSpans[id] = span
+    }
+    playSound("toggle", soundEnabled)
+    setCollectionSpans(safeSpans)
+    await chrome.storage.local.set({ [COLLECTION_SPANS_KEY]: safeSpans })
   }
 
   const updateCollectionAppearance = async (
@@ -2254,6 +2426,12 @@ function CollectionPage() {
 
   const deleteCollection = async (id: string) => {
     playSound("delete", soundEnabled)
+    if (collectionSpans[id]) {
+      const safeSpans = { ...collectionSpans }
+      delete safeSpans[id]
+      setCollectionSpans(safeSpans)
+      void chrome.storage.local.set({ [COLLECTION_SPANS_KEY]: safeSpans })
+    }
     await persist(collections.filter((c) => c.id !== id))
   }
 
@@ -2281,6 +2459,23 @@ function CollectionPage() {
         const newTabs = c.tabs.map((t, i) =>
           i === idx ? { ...t, locked: !t.locked } : t
         )
+        return { ...c, tabs: newTabs }
+      })
+    )
+  }
+
+  const toggleTabMaskTitle = async (colId: string, idx: number) => {
+    playSound("toggle", soundEnabled)
+    await persist(
+      collections.map((c) => {
+        if (c.id !== colId) return c
+        const newTabs = c.tabs.map((t, i) => {
+          if (i !== idx) return t
+          const nextMasked = t.maskedTitle
+            ? undefined
+            : getRandomMaskedTitle(t.title)
+          return { ...t, maskedTitle: nextMasked }
+        })
         return { ...c, tabs: newTabs }
       })
     )
@@ -2478,7 +2673,8 @@ function CollectionPage() {
       tabs: c.tabs.map((t) => ({
         title: t.title,
         url: t.url,
-        locked: t.locked
+        locked: t.locked,
+        maskedTitle: t.maskedTitle
       }))
     }))
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -2509,7 +2705,11 @@ function CollectionPage() {
           tabs: (Array.isArray(tabsData) ? tabsData : []).map((t: any) => ({
             title: String(t.title || ""),
             url: String(t.url || ""),
-            locked: Boolean(t.locked)
+            locked: Boolean(t.locked),
+            maskedTitle:
+              typeof t.maskedTitle === "string" && t.maskedTitle
+                ? t.maskedTitle
+                : undefined
           }))
         }
       })
@@ -2720,45 +2920,64 @@ function CollectionPage() {
               gap: 12,
               alignItems: "start"
             }}>
-            {distributeCollections(collections, windowColumns, collectionColumns).map(
-              (column, columnIndex) => (
+            {collections.map((col) => {
+              const currentSpan = Math.min(
+                getCollectionSpan(col.id),
+                windowColumns
+              )
+              return (
                 <div
-                  key={columnIndex}
-                  style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {column.map((col) => (
-                    <CollectionCard
-                      key={col.id}
-                      collection={col}
-                      otherCollections={collections.filter((c) => c.id !== col.id)}
-                      beamEnabled={beamEnabled}
-                      soundEnabled={soundEnabled}
-                      splitAnimating={splitAnimatingIds.has(col.id)}
-                      draggingTab={draggingTab}
-                      linkColumns={getCollectionColumns(col.id)}
-                      onOpenAll={() => openAllTabs(col.id)}
-                      onOpenTab={(url, idx) => openSingleTab(col.id, url, idx)}
-                      onDeleteTab={(idx) => deleteTab(col.id, idx)}
-                      onDelete={() => deleteCollection(col.id)}
-                      onSortByDomain={(order) =>
-                        sortCollectionByDomain(col.id, order)
-                      }
-                      onToggleLinkColumns={() => toggleCollectionColumns(col.id)}
-                      onSplit={() => splitCollection(col.id)}
-                      onTabDragStart={startTabDrag}
-                      onTabDragEnd={endTabDrag}
-                      onTabDrop={dropTab}
-                      onGather={(sourceId) => gatherToCollection(col.id, sourceId)}
-                      onMergeTo={(targetId) => mergeCollectionTo(col.id, targetId)}
-                      onToggleLock={() => toggleCollectionLock(col.id)}
-                      onToggleTabLock={(idx) => toggleTabLock(col.id, idx)}
-                      onAppearanceChange={(appearance) =>
-                        updateCollectionAppearance(col.id, appearance)
-                      }
-                    />
-                  ))}
+                  key={col.id}
+                  style={{
+                    gridColumn:
+                      currentSpan > 1 ? `span ${currentSpan}` : undefined,
+                    minWidth: 0,
+                    transition: "grid-column var(--dur) var(--ease)"
+                  }}>
+                  <CollectionCard
+                    collection={col}
+                    currentSpan={currentSpan}
+                    maxSpan={windowColumns}
+                    onResizeSpan={(newSpan) =>
+                      updateCollectionSpan(col.id, newSpan)
+                    }
+                    onResetSpan={() => updateCollectionSpan(col.id, 1)}
+                    otherCollections={collections.filter((c) => c.id !== col.id)}
+                    beamEnabled={beamEnabled}
+                    soundEnabled={soundEnabled}
+                    splitAnimating={splitAnimatingIds.has(col.id)}
+                    draggingTab={draggingTab}
+                    linkColumns={getCollectionColumns(col.id)}
+                    onOpenAll={() => openAllTabs(col.id)}
+                    onOpenTab={(url, idx) => openSingleTab(col.id, url, idx)}
+                    onDeleteTab={(idx) => deleteTab(col.id, idx)}
+                    onDelete={() => deleteCollection(col.id)}
+                    onSortByDomain={(order) =>
+                      sortCollectionByDomain(col.id, order)
+                    }
+                    onToggleLinkColumns={() => toggleCollectionColumns(col.id)}
+                    onSplit={() => splitCollection(col.id)}
+                    onTabDragStart={startTabDrag}
+                    onTabDragEnd={endTabDrag}
+                    onTabDrop={dropTab}
+                    onGather={(sourceId) =>
+                      gatherToCollection(col.id, sourceId)
+                    }
+                    onMergeTo={(targetId) =>
+                      mergeCollectionTo(col.id, targetId)
+                    }
+                    onToggleLock={() => toggleCollectionLock(col.id)}
+                    onToggleTabLock={(idx) => toggleTabLock(col.id, idx)}
+                    onToggleTabMaskTitle={(idx) =>
+                      toggleTabMaskTitle(col.id, idx)
+                    }
+                    onAppearanceChange={(appearance) =>
+                      updateCollectionAppearance(col.id, appearance)
+                    }
+                  />
                 </div>
               )
-            )}
+            })}
           </div>
         )}
       </div>
