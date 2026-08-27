@@ -17,6 +17,26 @@ interface Collection {
   timestamp: number
   tabs: TabInfo[]
   windowLabel?: string
+  locked?: boolean
+  lockedAt?: number
+}
+
+function sortCollections(collections: Collection[]): Collection[] {
+  return [...collections].sort((a, b) => {
+    const aLocked = Boolean(a.locked)
+    const bLocked = Boolean(b.locked)
+
+    if (aLocked && !bLocked) return -1
+    if (!aLocked && bLocked) return 1
+
+    if (aLocked && bLocked) {
+      const aTime = a.lockedAt ?? a.timestamp
+      const bTime = b.lockedAt ?? b.timestamp
+      return bTime - aTime
+    }
+
+    return b.timestamp - a.timestamp
+  })
 }
 
 const COLLECTION_URL = () => chrome.runtime.getURL("tabs/collection.html")
@@ -95,8 +115,8 @@ async function collectAllWindows() {
     windowIndex++
   }
 
-  // Persist (newest first)
-  await chrome.storage.local.set({ collections: [...newCollections, ...existing] })
+  // Persist (locked first by lockedAt, then unlocked by timestamp)
+  await chrome.storage.local.set({ collections: sortCollections([...newCollections, ...existing]) })
 
   // Open collection page
   const newTab = await chrome.tabs.create({ url: collectionUrl, active: true })
@@ -143,7 +163,7 @@ async function collectCurrentWindow() {
       windowLabel: "当前窗口",
     }
     await chrome.storage.local.set({
-      collections: [newCollection, ...existing],
+      collections: sortCollections([newCollection, ...existing]),
     })
   }
 

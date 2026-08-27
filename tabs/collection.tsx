@@ -54,6 +54,25 @@ interface Collection {
   backgroundImage?: string
   cardShader?: CardShader
   locked?: boolean
+  lockedAt?: number
+}
+
+function sortCollections(collections: Collection[]): Collection[] {
+  return [...collections].sort((a, b) => {
+    const aLocked = Boolean(a.locked)
+    const bLocked = Boolean(b.locked)
+
+    if (aLocked && !bLocked) return -1
+    if (!aLocked && bLocked) return 1
+
+    if (aLocked && bLocked) {
+      const aTime = a.lockedAt ?? a.timestamp
+      const bTime = b.lockedAt ?? b.timestamp
+      return bTime - aTime
+    }
+
+    return b.timestamp - a.timestamp
+  })
 }
 
 interface CardAppearanceUpdate {
@@ -1028,7 +1047,8 @@ function CollectionCard({
         style={{
           display: "flex",
           alignItems: "center",
-          flexWrap: "wrap",
+          justifyContent: "space-between",
+          flexWrap: "nowrap",
           padding: "12px 16px",
           borderBottom: "1px solid var(--border)",
           gap: 8,
@@ -1040,8 +1060,9 @@ function CollectionCard({
             display: "flex",
             flexDirection: "column",
             gap: 4,
-            flex: 1,
-            minWidth: 150
+            flex: "1 1 auto",
+            minWidth: 0,
+            overflow: "hidden"
           }}>
           <span
             style={{
@@ -1059,8 +1080,7 @@ function CollectionCard({
               letterSpacing: "-.01em",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              maxWidth: "7em"
+              whiteSpace: "nowrap"
             }}>
             {(() => {
               const t = collection.tabs?.[0]?.title || "";
@@ -1070,7 +1090,14 @@ function CollectionCard({
         </div>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 4, marginRight: 4 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            flexShrink: 0,
+            flexWrap: "nowrap"
+          }}>
           <IconBtn
             onClick={onToggleLock}
             title={
@@ -1242,106 +1269,73 @@ function CollectionCard({
               <i className="ri-scissors-cut-line"></i>
             </IconBtn>
           )}
-        </div>
-        {otherCollections.length > 0 && (
-          <div style={{ display: "flex", gap: 4, marginRight: 4 }}>
-            <div style={{ position: "relative" }} ref={gatherMenuRef}>
-              <button
-                title="归集：将其他卡片的标签页合并到当前卡片"
-                onClick={() => setShowGatherMenu(!showGatherMenu)}
-                style={{
-                  width: 24,
-                  height: 24,
-                  padding: 0,
-                  background: showGatherMenu ? "var(--bg3)" : "transparent",
-                  color: showGatherMenu ? "var(--text)" : "var(--text3)",
-                  border: "none",
-                  borderRadius: "var(--r-s)",
-                  fontSize: 13,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all var(--dur) var(--ease)"
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement
-                  if (!showGatherMenu) {
-                    el.style.background = "var(--bg3)"
-                    el.style.color = "var(--text)"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement
-                  if (!showGatherMenu) {
-                    el.style.background = "transparent"
-                    el.style.color = "var(--text3)"
-                  }
-                }}>
-                <i className="ri-game-line"></i>
-              </button>
-              {showGatherMenu && (
-                <div
-                  className="kt-merge-menu"
+
+          {otherCollections.length > 0 && (
+            <>
+              <div style={{ position: "relative" }} ref={gatherMenuRef}>
+                <button
+                  title="归集：将其他卡片的标签页合并到当前卡片"
+                  onClick={() => setShowGatherMenu(!showGatherMenu)}
                   style={{
-                    position: "absolute",
-                    top: "100%",
-                    right: 0,
-                    marginTop: 4,
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--r)",
-                    boxShadow: "var(--shadow-m)",
-                    padding: 4,
-                    minWidth: 160,
-                    zIndex: 10,
-                    maxHeight: 200,
-                    overflowY: "auto"
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    background: showGatherMenu ? "var(--bg3)" : "transparent",
+                    color: showGatherMenu ? "var(--text)" : "var(--text3)",
+                    border: "none",
+                    borderRadius: "var(--r-s)",
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all var(--dur) var(--ease)"
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement
+                    if (!showGatherMenu) {
+                      el.style.background = "var(--bg3)"
+                      el.style.color = "var(--text)"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement
+                    if (!showGatherMenu) {
+                      el.style.background = "transparent"
+                      el.style.color = "var(--text3)"
+                    }
                   }}>
+                  <i className="ri-game-line"></i>
+                </button>
+                {showGatherMenu && (
                   <div
+                    className="kt-merge-menu"
                     style={{
-                      padding: "4px 8px",
-                      fontSize: 11,
-                      color: "var(--text3)",
-                      fontWeight: 500
+                      position: "absolute",
+                      top: "100%",
+                      right: 0,
+                      marginTop: 4,
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--r)",
+                      boxShadow: "var(--shadow-m)",
+                      padding: 4,
+                      minWidth: 160,
+                      zIndex: 10,
+                      maxHeight: 200,
+                      overflowY: "auto"
                     }}>
-                    归集来源...
-                  </div>
-                  <button
-                    onClick={() => {
-                      onGather()
-                      setShowGatherMenu(false)
-                    }}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "6px 8px",
-                      background: "transparent",
-                      border: "none",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      color: "var(--accent)",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      transition: "background var(--dur) var(--ease)"
-                    }}
-                    onMouseEnter={(e) => {
-                      ;(
-                        e.currentTarget as HTMLButtonElement
-                      ).style.background = "var(--bg2)"
-                    }}
-                    onMouseLeave={(e) => {
-                      ;(
-                        e.currentTarget as HTMLButtonElement
-                      ).style.background = "transparent"
-                    }}>
-                    全部（{otherCollections.reduce((n, c) => n + (c.tabs?.length || 0), 0)}个）
-                  </button>
-                  {otherCollections.map((c) => (
+                    <div
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        fontWeight: 500
+                      }}>
+                      归集来源...
+                    </div>
                     <button
-                      key={c.id}
                       onClick={() => {
-                        onGather(c.id)
+                        onGather()
                         setShowGatherMenu(false)
                       }}
                       style={{
@@ -1353,7 +1347,8 @@ function CollectionCard({
                         border: "none",
                         borderRadius: 4,
                         fontSize: 12,
-                        color: "var(--text)",
+                        color: "var(--accent)",
+                        fontWeight: 600,
                         cursor: "pointer",
                         transition: "background var(--dur) var(--ease)"
                       }}
@@ -1367,180 +1362,213 @@ function CollectionCard({
                           e.currentTarget as HTMLButtonElement
                         ).style.background = "transparent"
                       }}>
-                      {(() => {
-                        const t = c.tabs?.[0]?.title || "";
-                        return t.length > 7 ? t.slice(0, 7) + "…" : t;
-                      })()} ({(c.tabs?.length || 0)}个)
+                      全部（{otherCollections.reduce((n, c) => n + (c.tabs?.length || 0), 0)}个）
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ position: "relative" }} ref={mergeMenuRef}>
-              <button
-                title="投奔：将当前卡片的标签页合并到其他卡片"
-                onClick={() => setShowMergeMenu(!showMergeMenu)}
-                style={{
-                  width: 24,
-                  height: 24,
-                  padding: 0,
-                  background: showMergeMenu ? "var(--bg3)" : "transparent",
-                  color: showMergeMenu ? "var(--text)" : "var(--text3)",
-                  border: "none",
-                  borderRadius: "var(--r-s)",
-                  fontSize: 13,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all var(--dur) var(--ease)"
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement
-                  if (!showMergeMenu) {
-                    el.style.background = "var(--bg3)"
-                    el.style.color = "var(--text)"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement
-                  if (!showMergeMenu) {
-                    el.style.background = "transparent"
-                    el.style.color = "var(--text3)"
-                  }
-                }}>
-                <i className="ri-game-2-line"></i>
-              </button>
-              {showMergeMenu && (
-                <div
-                  className="kt-merge-menu"
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    right: 0,
-                    marginTop: 4,
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--r)",
-                    boxShadow: "var(--shadow-m)",
-                    padding: 4,
-                    minWidth: 160,
-                    zIndex: 10,
-                    maxHeight: 200,
-                    overflowY: "auto"
-                  }}>
-                  <div
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: 11,
-                      color: "var(--text3)",
-                      fontWeight: 500
-                    }}>
-                    合并到...
+                    {otherCollections.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          onGather(c.id)
+                          setShowGatherMenu(false)
+                        }}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "6px 8px",
+                          background: "transparent",
+                          border: "none",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          color: "var(--text)",
+                          cursor: "pointer",
+                          transition: "background var(--dur) var(--ease)"
+                        }}
+                        onMouseEnter={(e) => {
+                          ;(
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "var(--bg2)"
+                        }}
+                        onMouseLeave={(e) => {
+                          ;(
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "transparent"
+                        }}>
+                        {(() => {
+                          const t = c.tabs?.[0]?.title || "";
+                          return t.length > 7 ? t.slice(0, 7) + "…" : t;
+                        })()} ({(c.tabs?.length || 0)}个)
+                      </button>
+                    ))}
                   </div>
-                  {otherCollections.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        onMergeTo(c.id)
-                        setShowMergeMenu(false)
-                      }}
+                )}
+              </div>
+              <div style={{ position: "relative" }} ref={mergeMenuRef}>
+                <button
+                  title="投奔：将当前卡片的标签页合并到其他卡片"
+                  onClick={() => setShowMergeMenu(!showMergeMenu)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    background: showMergeMenu ? "var(--bg3)" : "transparent",
+                    color: showMergeMenu ? "var(--text)" : "var(--text3)",
+                    border: "none",
+                    borderRadius: "var(--r-s)",
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all var(--dur) var(--ease)"
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement
+                    if (!showMergeMenu) {
+                      el.style.background = "var(--bg3)"
+                      el.style.color = "var(--text)"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement
+                    if (!showMergeMenu) {
+                      el.style.background = "transparent"
+                      el.style.color = "var(--text3)"
+                    }
+                  }}>
+                  <i className="ri-game-2-line"></i>
+                </button>
+                {showMergeMenu && (
+                  <div
+                    className="kt-merge-menu"
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      right: 0,
+                      marginTop: 4,
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--r)",
+                      boxShadow: "var(--shadow-m)",
+                      padding: 4,
+                      minWidth: 160,
+                      zIndex: 10,
+                      maxHeight: 200,
+                      overflowY: "auto"
+                    }}>
+                    <div
                       style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "6px 8px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 4,
-                        fontSize: 12,
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        transition: "background var(--dur) var(--ease)"
-                      }}
-                      onMouseEnter={(e) => {
-                        ;(
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "var(--bg2)"
-                      }}
-                      onMouseLeave={(e) => {
-                        ;(
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "transparent"
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        fontWeight: 500
                       }}>
-                      {formatDate(c.timestamp)} ({c.tabs.length}个)
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        <button
-          onClick={onOpenAll}
-          style={{
-            width: 32,
-            height: 32,
-            padding: 0,
-            background: "var(--accent)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "var(--r-s)",
-            fontSize: fs(12.5),
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: "var(--font)",
-            flexShrink: 0,
-            transition: "background var(--dur) var(--ease)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 0
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.background =
-              "var(--accent2)"
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.background =
-              "var(--accent)"
-          }}>
-          <i className="ri-external-link-line"></i>
-        </button>
-        <button
-          onClick={onDelete}
-          style={{
-            width: 32,
-            height: 32,
-            padding: 0,
-            background: "transparent",
-            color: "var(--text3)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r-s)",
-            fontSize: fs(12.5),
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: "var(--font)",
-            flexShrink: 0,
-            transition: "all var(--dur) var(--ease)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 0
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLButtonElement
-            el.style.background = "var(--bg3)"
-            el.style.borderColor = "var(--border2)"
-            el.style.color = "var(--text2)"
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget as HTMLButtonElement
-            el.style.background = "transparent"
-            el.style.borderColor = "var(--border)"
-            el.style.color = "var(--text3)"
-          }}>
-          <i className="ri-delete-bin-line"></i>
-        </button>
+                      合并到...
+                    </div>
+                    {otherCollections.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          onMergeTo(c.id)
+                          setShowMergeMenu(false)
+                        }}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "6px 8px",
+                          background: "transparent",
+                          border: "none",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          color: "var(--text)",
+                          cursor: "pointer",
+                          transition: "background var(--dur) var(--ease)"
+                        }}
+                        onMouseEnter={(e) => {
+                          ;(
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "var(--bg2)"
+                        }}
+                        onMouseLeave={(e) => {
+                          ;(
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "transparent"
+                        }}>
+                        {formatDate(c.timestamp)} ({c.tabs.length}个)
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          <button
+            onClick={onOpenAll}
+            style={{
+              width: 32,
+              height: 32,
+              padding: 0,
+              background: "var(--accent)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--r-s)",
+              fontSize: fs(12.5),
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--font)",
+              flexShrink: 0,
+              transition: "background var(--dur) var(--ease)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 0
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.background =
+                "var(--accent2)"
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.background =
+                "var(--accent)"
+            }}>
+            <i className="ri-external-link-line"></i>
+          </button>
+          <button
+            onClick={onDelete}
+            style={{
+              width: 32,
+              height: 32,
+              padding: 0,
+              background: "transparent",
+              color: "var(--text3)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--r-s)",
+              fontSize: fs(12.5),
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--font)",
+              flexShrink: 0,
+              transition: "all var(--dur) var(--ease)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 0
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement
+              el.style.background = "var(--bg3)"
+              el.style.borderColor = "var(--border2)"
+              el.style.color = "var(--text2)"
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement
+              el.style.background = "transparent"
+              el.style.borderColor = "var(--border)"
+              el.style.color = "var(--text3)"
+            }}>
+            <i className="ri-delete-bin-line"></i>
+          </button>
+        </div>
       </div>
 
       {/* ── Tab list ── */}
@@ -1876,7 +1904,7 @@ function CollectionPage() {
                 ? c.tabs.filter((t: any) => t && typeof t === "object")
                 : []
             }))
-          setCollections(sanitized)
+          setCollections(sortCollections(sanitized))
         }
         if (r[FONT_KEY]) {
           const opt = ALL_FONTS.find((f) => f.id === r[FONT_KEY]) ?? SYSTEM_FONT
@@ -1964,8 +1992,9 @@ function CollectionPage() {
 
   /* ── Persist ── */
   const persist = async (updated: Collection[]) => {
-    setCollections(updated)
-    await chrome.storage.local.set({ collections: updated })
+    const sorted = sortCollections(updated)
+    setCollections(sorted)
+    await chrome.storage.local.set({ collections: sorted })
   }
 
   const toggleTheme = async () => {
@@ -2151,10 +2180,17 @@ function CollectionPage() {
 
   const toggleCollectionLock = async (id: string) => {
     playSound("toggle", soundEnabled)
+    const now = Date.now()
     await persist(
-      collections.map((c) =>
-        c.id === id ? { ...c, locked: !c.locked } : c
-      )
+      collections.map((c) => {
+        if (c.id !== id) return c
+        const nextLocked = !c.locked
+        return {
+          ...c,
+          locked: nextLocked,
+          lockedAt: nextLocked ? now : undefined
+        }
+      })
     )
   }
 
