@@ -13,9 +13,15 @@ function GuidePage() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    chrome.storage.local.get("collections").then((r) => {
+    chrome.storage.local.get(["collections", "shiye-card-radius"]).then((r) => {
       const collections = (r.collections || []) as Collection[]
       setCount(collections.length)
+      if (typeof r["shiye-card-radius"] === "number") {
+        const radius = Math.min(28, Math.max(0, Math.round(r["shiye-card-radius"])))
+        document.documentElement.style.setProperty("--r", `${radius}px`)
+        const rs = Math.max(0, Math.min(10, Math.round(radius * (8 / 14))))
+        document.documentElement.style.setProperty("--r-s", `${rs}px`)
+      }
     })
   }, [])
 

@@ -115,6 +115,7 @@ const FONT_KEY = "shiye-font-id"
 const THEME_KEY = "shiye-theme"
 const FONT_SCALE_KEY = "shiye-font-scale"
 const FONT_WEIGHT_KEY = "shiye-font-weight"
+const CARD_RADIUS_KEY = "shiye-card-radius"
 const BEAM_KEY = "shiye-beam-enabled"
 const CURSOR_KEY = "shiye-cursor-enabled"
 const SOUND_KEY = "shiye-sound-enabled"
@@ -182,6 +183,12 @@ const WINDOW_COLUMNS_DEFAULT = 2
 const COLLECTION_COLUMNS_DEFAULT = 1
 const SPLIT_THRESHOLD = 15
 
+/* 窗口边缘圆角范围：0px（直角）至 28px（圆角） */
+const RADIUS_MIN = 0
+const RADIUS_MAX = 28
+const RADIUS_STEP = 2
+const RADIUS_DEFAULT = 14
+
 /** 可缩放的内容字号：基准 px × 用户缩放系数 */
 const fs = (px: number) => `calc(${px}px * var(--fs))`
 
@@ -194,6 +201,11 @@ function clampFontWeight(v: unknown): FontWeightValue {
   return WEIGHT_OPTIONS.includes(v as FontWeightValue)
     ? (v as FontWeightValue)
     : WEIGHT_DEFAULT
+}
+
+function clampCardRadius(v: number): number {
+  if (!Number.isFinite(v)) return RADIUS_DEFAULT
+  return Math.min(RADIUS_MAX, Math.max(RADIUS_MIN, Math.round(v)))
 }
 
 function clampWindowColumns(v: number): number {
@@ -506,6 +518,13 @@ function applyFontWeight(weight: FontWeightValue) {
   const strong = base === 400 ? 600 : base === 500 ? 700 : 800
   document.documentElement.style.setProperty("--fw", String(base))
   document.documentElement.style.setProperty("--fw-strong", String(strong))
+}
+
+function applyCardRadius(radius: number) {
+  const r = clampCardRadius(radius)
+  document.documentElement.style.setProperty("--r", `${r}px`)
+  const rs = Math.max(0, Math.min(10, Math.round(r * (8 / 14))))
+  document.documentElement.style.setProperty("--r-s", `${rs}px`)
 }
 
 // 已加载/加载中的字体 CSS，跨预览与应用去重，避免重复请求
@@ -1194,8 +1213,8 @@ function CollectionCard({
           padding: "10px 14px",
           borderBottom: "1px solid var(--border)",
           gap: 8,
-          borderTopLeftRadius: "calc(var(--r) - 1px)",
-          borderTopRightRadius: "calc(var(--r) - 1px)"
+          borderTopLeftRadius: "max(0px, calc(var(--r) - 1px))",
+          borderTopRightRadius: "max(0px, calc(var(--r) - 1px))"
         }}>
         <div
           style={{
@@ -1928,6 +1947,60 @@ function FontWeightControl({
   )
 }
 
+/* ── Window radius control ───────────────────────────────────── */
+function WindowRadiusControl({
+  radius,
+  onChange
+}: {
+  radius: number
+  onChange: (next: number) => void
+}) {
+  const presets: Array<{ label: string; value: number; hint: string }> = [
+    { label: "直角", value: 0, hint: "直角 0px" },
+    { label: "微圆", value: 6, hint: "微圆 6px" },
+    { label: "默认", value: 14, hint: "默认 14px" },
+    { label: "圆角", value: 24, hint: "圆角 24px" }
+  ]
+
+  return (
+    <div className="kt-size-row">
+      <span className="kt-font-label">圆角</span>
+      <div className="kt-size-bar">
+        <button
+          className="kt-size-btn"
+          disabled={radius <= RADIUS_MIN}
+          onClick={() => onChange(radius - RADIUS_STEP)}
+          title="减小圆角（步进 2px）">
+          −
+        </button>
+        <span className="kt-size-val">
+          {radius}px
+          {radius === 0 ? " (直角)" : radius >= 24 ? " (圆角)" : ""}
+        </span>
+        <button
+          className="kt-size-btn"
+          disabled={radius >= RADIUS_MAX}
+          onClick={() => onChange(radius + RADIUS_STEP)}
+          title="增大圆角（步进 2px）">
+          +
+        </button>
+      </div>
+      <div className="kt-size-bar" style={{ flex: "0 0 auto", gap: 3 }}>
+        {presets.map((p) => (
+          <button
+            key={p.value}
+            className={`kt-weight-btn${radius === p.value ? " active" : ""}`}
+            style={{ padding: "0 7px", width: "auto" }}
+            onClick={() => onChange(p.value)}
+            title={p.hint}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ── Font row — lazy-loads its own preview when scrolled into view ── */
 function FontRow({
   font,
@@ -1980,16 +2053,20 @@ function FontPicker({
   activeId,
   scale,
   weight,
+  radius,
   onSelectFont,
   onScaleChange,
-  onWeightChange
+  onWeightChange,
+  onRadiusChange
 }: {
   activeId: string
   scale: number
   weight: FontWeightValue
+  radius: number
   onSelectFont: (font: SelectableFont) => void
   onScaleChange: (next: number) => void
   onWeightChange: (next: FontWeightValue) => void
+  onRadiusChange: (next: number) => void
 }) {
   const [query, setQuery] = useState("")
   // 回调 ref 转 state：附加后触发重渲染，让子项拿到真实的滚动容器作为观察根
@@ -2006,6 +2083,7 @@ function FontPicker({
     <div className="kt-font-panel">
       <FontSizeStepper scale={scale} onChange={onScaleChange} />
       <FontWeightControl weight={weight} onChange={onWeightChange} />
+      <WindowRadiusControl radius={radius} onChange={onRadiusChange} />
 
       <input
         className="kt-font-search"
@@ -2059,6 +2137,7 @@ function CollectionPage() {
   const [fontId, setFontId] = useState("system")
   const [fontScale, setFontScale] = useState(SCALE_DEFAULT)
   const [fontWeight, setFontWeight] = useState<FontWeightValue>(WEIGHT_DEFAULT)
+  const [cardRadius, setCardRadius] = useState(RADIUS_DEFAULT)
   const [showFontPanel, setShowFontPanel] = useState(false)
   const [theme, setTheme] = useState<Theme>("auto")
   const [beamEnabled, setBeamEnabled] = useState(BEAM_DEFAULT)
@@ -2096,6 +2175,7 @@ function CollectionPage() {
         THEME_KEY,
         FONT_SCALE_KEY,
         FONT_WEIGHT_KEY,
+        CARD_RADIUS_KEY,
         BEAM_KEY,
         CURSOR_KEY,
         SOUND_KEY,
@@ -2130,6 +2210,11 @@ function CollectionPage() {
           const v = clampFontWeight(r[FONT_WEIGHT_KEY])
           setFontWeight(v)
           applyFontWeight(v)
+        }
+        if (typeof r[CARD_RADIUS_KEY] === "number") {
+          const v = clampCardRadius(r[CARD_RADIUS_KEY])
+          setCardRadius(v)
+          applyCardRadius(v)
         }
         if (r[THEME_KEY]) {
           const t = r[THEME_KEY] as Theme
@@ -2332,6 +2417,14 @@ function CollectionPage() {
     setFontWeight(v)
     applyFontWeight(v)
     await chrome.storage.local.set({ [FONT_WEIGHT_KEY]: v })
+  }
+
+  const changeCardRadius = async (next: number) => {
+    const v = clampCardRadius(next)
+    playSound("tap", soundEnabled)
+    setCardRadius(v)
+    applyCardRadius(v)
+    await chrome.storage.local.set({ [CARD_RADIUS_KEY]: v })
   }
 
   /* ── Tab ops ── */
@@ -2795,7 +2888,7 @@ function CollectionPage() {
             </NavBtn>
             <NavBtn
               onClick={() => setShowFontPanel((v) => !v)}
-              title="字体"
+              title="外观与字体"
               active={showFontPanel}>
               <i className="ri-font-serif"></i>
             </NavBtn>
@@ -2828,9 +2921,11 @@ function CollectionPage() {
             activeId={fontId}
             scale={fontScale}
             weight={fontWeight}
+            radius={cardRadius}
             onSelectFont={selectFont}
             onScaleChange={changeFontScale}
             onWeightChange={changeFontWeight}
+            onRadiusChange={changeCardRadius}
           />
         )}
       </div>

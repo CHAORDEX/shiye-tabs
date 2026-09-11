@@ -286,8 +286,8 @@ html[data-theme="dark"] .kt-nav {
 }
 .kt-card-list {
   background: var(--card-list, var(--card));
-  border-bottom-left-radius: calc(var(--r) - 1px);
-  border-bottom-right-radius: calc(var(--r) - 1px);
+  border-bottom-left-radius: max(0px, calc(var(--r) - 1px));
+  border-bottom-right-radius: max(0px, calc(var(--r) - 1px));
   backdrop-filter: blur(14px) saturate(1.08);
   -webkit-backdrop-filter: blur(14px) saturate(1.08);
   transition: filter var(--dur) var(--ease), opacity var(--dur) var(--ease);
