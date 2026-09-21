@@ -1,7 +1,7 @@
 {
   "name": "shiye-tabs",
   "displayName": "拾页 Shiye",
-  "version": "0.0.49",
+  "version": "0.0.50",
   "description": "A graceful tab collector for one-click capture and restore",
   "author": "z",
   "scripts": {
@@ -37,7 +37,8 @@
       "storage",
       "contextMenus",
       "windows",
-      "declarativeNetRequest"
+      "declarativeNetRequest",
+      "sessions"
     ],
     "content_security_policy": {
       "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'self' https:"

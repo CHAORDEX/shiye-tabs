@@ -58,6 +58,16 @@ interface Collection {
   lockedAt?: number
 }
 
+interface SyncedTab {
+  title: string
+  url: string
+}
+
+interface SyncedDevice {
+  deviceName: string
+  windows: { tabs: SyncedTab[] }[]
+}
+
 function sortCollections(collections: Collection[]): Collection[] {
   return [...collections].sort((a, b) => {
     const aLocked = Boolean(a.locked)
@@ -1832,6 +1842,252 @@ function CollectionCard({
   )
 }
 
+/* ── Synced tabs card (read-only) ────────────────────────────── */
+function SyncedTabsCard({
+  device,
+  windowIndex,
+  tabs,
+  beamEnabled,
+  soundEnabled
+}: {
+  device: string
+  windowIndex: number
+  tabs: SyncedTab[]
+  beamEnabled: boolean
+  soundEnabled: boolean
+}) {
+  const [hCard, setHCard] = useState(false)
+
+  const openAll = async () => {
+    playSound("complete", soundEnabled)
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.create({ url: tab.url, active: false })
+      } catch {}
+    }
+  }
+
+  const openTab = (url: string, event: React.MouseEvent) => {
+    playSound("open", soundEnabled)
+    chrome.tabs.create({ url, active: false }).catch(() => {})
+    if (beamEnabled) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const origin: Point = {
+        x: rect.right + 13,
+        y: rect.top + rect.height / 2
+      }
+      playTabArrow(origin)
+    }
+  }
+
+  return (
+    <div
+      className="kt-collection-card"
+      data-card-style="classic"
+      data-card-mode="theme"
+      onMouseEnter={() => setHCard(true)}
+      onMouseLeave={() => setHCard(false)}
+      style={{
+        position: "relative",
+        zIndex: 1,
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--r)",
+        boxShadow: hCard ? "var(--shadow-m)" : "var(--shadow-s)",
+        transition:
+          "box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease)",
+        transform: hCard ? "translateY(-1px)" : "translateY(0)"
+      }}>
+      <div className="kt-card-visual" aria-hidden="true" />
+      {/* Header */}
+      <div
+        className="kt-card-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "nowrap",
+          padding: "10px 14px",
+          borderBottom: "1px solid var(--border)",
+          gap: 8,
+          borderTopLeftRadius: "max(0px, calc(var(--r) - 1px))",
+          borderTopRightRadius: "max(0px, calc(var(--r) - 1px))"
+        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flex: "1 1 auto",
+            minWidth: 0,
+            overflow: "hidden",
+            gap: 6
+          }}>
+          <i
+            className="ri-computer-line"
+            style={{ fontSize: fs(13), color: "var(--text3)", flexShrink: 0 }}
+          />
+          <span
+            style={{
+              fontSize: fs(13),
+              fontWeight: "var(--fw-medium, 500)",
+              color: "var(--text2)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }}>
+            {device}{windowIndex > 0 ? ` · 窗口 ${windowIndex + 1}` : ""}
+          </span>
+          <span
+            style={{
+              fontSize: fs(12),
+              color: "var(--text3)",
+              flexShrink: 0
+            }}>
+            {tabs.length} 个标签
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={openAll}
+            style={{
+              width: 32,
+              height: 32,
+              padding: 0,
+              background: "var(--accent)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--r-s)",
+              fontSize: fs(12.5),
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--font)",
+              flexShrink: 0,
+              transition: "background var(--dur) var(--ease)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.background =
+                "var(--accent2)"
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.background =
+                "var(--accent)"
+            }}>
+            <i className="ri-external-link-line"></i>
+          </button>
+        </div>
+      </div>
+      {/* Tab list */}
+      <div
+        className="kt-card-list"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr)",
+          gap: 2,
+          padding: "8px 8px"
+        }}>
+        {tabs.map((tab, i) => {
+          const favicon = getFavicon(tab.url)
+          return <SyncedTabRow key={`${tab.url}-${i}`} tab={tab} favicon={favicon} onOpen={openTab} soundEnabled={soundEnabled} />
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SyncedTabRow({
+  tab,
+  favicon,
+  onOpen,
+  soundEnabled
+}: {
+  tab: SyncedTab
+  favicon: string | null
+  onOpen: (url: string, e: React.MouseEvent) => void
+  soundEnabled: boolean
+}) {
+  const [h, setH] = useState(false)
+  return (
+    <div
+      title={tab.url}
+      onClick={(e) => onOpen(tab.url, e)}
+      onMouseEnter={() => {
+        setH(true)
+        playSound("hover", soundEnabled)
+      }}
+      onMouseLeave={() => setH(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "7px 10px",
+        borderRadius: 7,
+        background: h ? "var(--bg2)" : "transparent",
+        cursor: "pointer",
+        transition: "background var(--dur) var(--ease)",
+        minWidth: 0
+      }}>
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+        {favicon ? (
+          <img
+            src={favicon}
+            alt=""
+            style={{ width: 15, height: 15, borderRadius: 3, opacity: 0.82 }}
+            onError={(e) => {
+              ;(e.currentTarget as HTMLImageElement).style.display = "none"
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: "var(--border2)"
+            }}
+          />
+        )}
+      </div>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: fs(14),
+          fontWeight: "var(--fw)",
+          color: "var(--text)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          lineHeight: 1.4
+        }}>
+        {tab.title || tab.url}
+      </span>
+      <div
+        style={{
+          display: "flex",
+          gap: 2,
+          flexShrink: 0,
+          opacity: h ? 1 : 0,
+          transition: "opacity var(--dur) var(--ease)"
+        }}>
+        <IconBtn onClick={(e) => { e.stopPropagation(); onOpen(tab.url, e) }} title="打开标签" accent hint>
+          <i className="ri-external-link-line"></i>
+        </IconBtn>
+      </div>
+    </div>
+  )
+}
+
 /* ── Header icon button helper ───────────────────────────────── */
 function NavBtn({
   children,
@@ -2133,6 +2389,7 @@ function FontPicker({
 /* ── Main ────────────────────────────────────────────────────── */
 function CollectionPage() {
   const [collections, setCollections] = useState<Collection[]>([])
+  const [syncedDevices, setSyncedDevices] = useState<SyncedDevice[]>([])
   const [loading, setLoading] = useState(true)
   const [fontId, setFontId] = useState("system")
   const [fontScale, setFontScale] = useState(SCALE_DEFAULT)
@@ -2252,6 +2509,29 @@ function CollectionPage() {
       .finally(() => {
         setLoading(false)
       })
+
+    // 获取同步标签页
+    chrome.sessions?.getDevices?.()?.then((devices) => {
+      const result: SyncedDevice[] = (devices || [])
+        .map((d) => {
+          const windows: { tabs: SyncedTab[] }[] = []
+          for (const session of d.sessions || []) {
+            if (session.window?.tabs) {
+              const tabs = session.window.tabs
+                .filter((t) => t.url && t.title)
+                .map((t) => ({ title: t.title!, url: t.url! }))
+              if (tabs.length > 0) windows.push({ tabs })
+            } else if (session.tab?.url && session.tab?.title) {
+              windows.push({
+                tabs: [{ title: session.tab.title, url: session.tab.url }]
+              })
+            }
+          }
+          return { deviceName: d.deviceName, windows }
+        })
+        .filter((d) => d.windows.length > 0)
+      setSyncedDevices(result)
+    }).catch(() => {})
   }, [])
 
   /* ── Close font panel on outside click ── */
@@ -3055,6 +3335,60 @@ function CollectionPage() {
               )
             })}
           </div>
+        )}
+
+        {/* ── Synced Tabs ── */}
+        {!loading && syncedDevices.length > 0 && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                margin: collections.length > 0 ? "32px 0 16px" : "0 0 16px",
+              }}>
+              <i
+                className="ri-device-line"
+                style={{ fontSize: 16, color: "var(--text3)" }}
+              />
+              <span
+                style={{
+                  fontSize: fs(14),
+                  fontWeight: "var(--fw-strong)",
+                  color: "var(--text2)"
+                }}>
+                其他设备
+              </span>
+              <div
+                style={{
+                  flex: 1,
+                  height: 1,
+                  background: "var(--border)"
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${windowColumns}, minmax(0, 1fr))`,
+                gap: 12,
+                alignItems: "start"
+              }}>
+              {syncedDevices.flatMap((device) =>
+                device.windows.map((win, wi) => (
+                  <div key={`${device.deviceName}-${wi}`} style={{ minWidth: 0 }}>
+                    <SyncedTabsCard
+                      device={device.deviceName}
+                      windowIndex={device.windows.length > 1 ? wi : 0}
+                      tabs={win.tabs}
+                      beamEnabled={beamEnabled}
+                      soundEnabled={soundEnabled}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </>
         )}
       </div>
 
