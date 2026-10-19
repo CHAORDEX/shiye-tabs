@@ -12,7 +12,11 @@ import {
   Voronoi,
   Swirl,
   Warp,
-  DotOrbit
+  DotOrbit,
+  LiquidMetal,
+  Water,
+  Dithering,
+  Spiral
 } from "@paper-design/shaders-react"
 
 import "remixicon/fonts/remixicon.css"
@@ -32,7 +36,23 @@ import { playScrollGear, playSound } from "./sounds"
 type Theme = "light" | "dark" | "auto"
 type DomainSortOrder = "asc" | "desc"
 type CardStyle = "classic" | "paper" | "glass" | "noir" | "aurora" | "ocean" | "sunset" | "lavender" | "forest" | "rose" | "slate" | "amber"
-type CardShader = "mesh" | "neuro" | "grain" | "waves" | "smoke" | "metaballs" | "godRays" | "simplex" | "voronoi" | "swirl" | "warp" | "dotOrbit"
+type CardShader =
+  | "liquidMetal"
+  | "water"
+  | "mesh"
+  | "dithering"
+  | "spiral"
+  | "neuro"
+  | "grain"
+  | "waves"
+  | "smoke"
+  | "metaballs"
+  | "godRays"
+  | "simplex"
+  | "voronoi"
+  | "swirl"
+  | "warp"
+  | "dotOrbit"
 
 interface DraggedTab {
   colId: string
@@ -133,6 +153,7 @@ const COLLECT_MODE_KEY = "shiye-collect-mode"
 const WINDOW_COLUMNS_KEY = "shiye-window-columns"
 const COLLECTION_COLUMNS_KEY = "shiye-collection-columns"
 const COLLECTION_SPANS_KEY = "shiye-collection-spans"
+const SHOW_SYNCED_TABS_KEY = "shiye-show-synced-tabs"
 const TAB_DRAG_MIME = "application/x-shiye-tab"
 type CollectMode = "all" | "current"
 
@@ -141,18 +162,18 @@ const CARD_STYLES: Array<{
   name: string
   description: string
 }> = [
-  { id: "classic", name: "清简", description: "干净克制" },
-  { id: "paper", name: "纸感", description: "温润自然" },
-  { id: "glass", name: "雾玻璃", description: "轻盈通透" },
-  { id: "noir", name: "夜幕", description: "深邃沉静" },
-  { id: "aurora", name: "流光", description: "柔和灵动" },
-  { id: "ocean", name: "深海", description: "清凉沉稳" },
-  { id: "sunset", name: "晚霞", description: "绮丽暖意" },
-  { id: "lavender", name: "薰衣草", description: "淡雅紫韵" },
-  { id: "forest", name: "森丘", description: "静谧深绿" },
-  { id: "rose", name: "粉黑", description: "柔美精致" },
-  { id: "slate", name: "睡岩", description: "冷峻理性" },
-  { id: "amber", name: "琥珀", description: "金曜温醒" }
+  { id: "classic", name: "清简", description: "凝炼白瓷与极简空间" },
+  { id: "paper", name: "和纸", description: "手工纸感与朱砂茶韵" },
+  { id: "glass", name: "雾玻", description: "通透磨砂晶体折射" },
+  { id: "noir", name: "夜幕", description: "黑曜石与拉丝暖金" },
+  { id: "aurora", name: "极光", description: "北欧幽夜薄荷流芒" },
+  { id: "ocean", name: "深海", description: "马里亚纳冷澈蔚蓝" },
+  { id: "sunset", name: "暮霞", description: "加州黄昏落日金晕" },
+  { id: "lavender", name: "薰衣", description: "柔雾淡紫与云母珠光" },
+  { id: "forest", name: "森丘", description: "高山冷杉与深林青苔" },
+  { id: "rose", name: "暗玫", description: "丝绒浆果与现代黑粉" },
+  { id: "slate", name: "玄岩", description: "冰岛玄武岩冷峻格调" },
+  { id: "amber", name: "琥珀", description: "陈年蜜蜡与威士忌光" }
 ]
 
 const CARD_SHADERS: Array<{
@@ -160,18 +181,22 @@ const CARD_SHADERS: Array<{
   name: string
   description: string
 }> = [
-  { id: "mesh", name: "暮色织网", description: "柔和流动的网格渐变" },
-  { id: "neuro", name: "神经微光", description: "有机呼吸的噪声光影" },
-  { id: "grain", name: "颗粒潮汐", description: "带纸张颗粒的色彩潮汐" },
-  { id: "waves", name: "静谧波纹", description: "克制而有秩序的波浪" },
-  { id: "smoke", name: "烟环漫舞", description: "如缕如雾的烟环缠绕" },
-  { id: "metaballs", name: "液态融球", description: "变形融合的有机球体" },
-  { id: "godRays", name: "天光万丈", description: "从中心辐射的光束" },
-  { id: "simplex", name: "晶体噪声", description: "单纯变化的噪点曲线" },
-  { id: "voronoi", name: "泰森割图", description: "几何细胞的明暗交错" },
-  { id: "swirl", name: "螺旋涡流", description: "向内旋转的彩带" },
-  { id: "warp", name: "扇面扇染", description: "扁平花纹的柔和扭曲" },
-  { id: "dotOrbit", name: "星球轨迹", description: "旋转走马灯般的圆点" }
+  { id: "liquidMetal", name: "液态水银", description: "流体金属镜面反光" },
+  { id: "water", name: "浮光澄水", description: "清澈焦散自然水波" },
+  { id: "mesh", name: "暮色织网", description: "极光柔光多维流转" },
+  { id: "dithering", name: "数字点阵", description: "现代极客复古波纹" },
+  { id: "spiral", name: "几何螺线", description: "数学螺线极简光轨" },
+  { id: "neuro", name: "星云脉冲", description: "深空有机呼吸微光" },
+  { id: "grain", name: "胶片潮汐", description: "温润胶片颗粒流晕" },
+  { id: "waves", name: "静谧波澜", description: "丝绢般起伏的涟漪" },
+  { id: "smoke", name: "幽夜冷雾", description: "如缕轻盈烟岚流散" },
+  { id: "metaballs", name: "流光融球", description: "晶莹有机融球律动" },
+  { id: "godRays", name: "晨曦天光", description: "丁达尔神圣漫射光" },
+  { id: "simplex", name: "晶核流光", description: "深邃晶格波函数微澜" },
+  { id: "voronoi", name: "泰森微晶", description: "几何晶石切面光晕" },
+  { id: "swirl", name: "引力星旋", description: "深邃星际双色涡流" },
+  { id: "warp", name: "极光织锦", description: "柔和流动空间曲面" },
+  { id: "dotOrbit", name: "天体引力", description: "克制纯粹的公转轨迹" }
 ]
 
 /** 打开标签时的光束动画默认开启 */
@@ -327,9 +352,22 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
   }
 
   const shaderBg: Record<CardShader, string> = {
-    mesh: "#101827", neuro: "#111827", grain: "#142b2a", waves: "#17343b",
-    smoke: "#0c0e14", metaballs: "#0b1220", godRays: "#08090d", simplex: "#1a1a2e",
-    voronoi: "#1b1f3b", swirl: "#0a0a1a", warp: "#2d0a31", dotOrbit: "#0d1117"
+    liquidMetal: "#07090e",
+    water: "#061220",
+    mesh: "#080d1a",
+    dithering: "#080c14",
+    spiral: "#070810",
+    neuro: "#060913",
+    grain: "#0e1816",
+    waves: "#0d1f24",
+    smoke: "#06080e",
+    metaballs: "#070b14",
+    godRays: "#07070a",
+    simplex: "#0a192f",
+    voronoi: "#0c1220",
+    swirl: "#060712",
+    warp: "#150c20",
+    dotOrbit: "#080c14"
   }
 
   const common = {
@@ -353,154 +391,209 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
       ref={containerRef}
       className="kt-paper-shader"
       data-shader={shader}>
+      {visible && shader === "liquidMetal" && (
+        <LiquidMetal
+          {...common}
+          colorBack="#07090e"
+          colorTint="#b4d4f8"
+          shape="none"
+          repetition={1.8}
+          distortion={0.12}
+          softness={0.25}
+          shiftRed={0.3}
+          shiftBlue={-0.2}
+          contour={0.3}
+          angle={105}
+          speed={speed * 0.7}
+        />
+      )}
+      {visible && shader === "water" && (
+        <Water
+          {...common}
+          colorBack="#061220"
+          colorHighlight="#6ae4f2"
+          highlights={0.25}
+          layering={0.4}
+          caustic={0.24}
+          waves={0.35}
+          size={0.85}
+          speed={speed * 0.65}
+        />
+      )}
       {visible && shader === "mesh" && (
         <MeshGradient
           {...common}
-          colors={["#101827", "#275769", "#b86f55", "#e6b56d"]}
-          distortion={0.82}
-          swirl={0.42}
-          grainMixer={0.22}
-          grainOverlay={0.16}
-          speed={speed}
+          colors={["#080d1a", "#153347", "#c26359", "#f5c589"]}
+          distortion={0.78}
+          swirl={0.35}
+          grainMixer={0.2}
+          grainOverlay={0.12}
+          speed={speed * 0.8}
+        />
+      )}
+      {visible && shader === "dithering" && (
+        <Dithering
+          {...common}
+          colorBack="#080c14"
+          colorFront="#60a5fa"
+          shape="warp"
+          type="4x4"
+          size={2.2}
+          speed={speed * 0.5}
+        />
+      )}
+      {visible && shader === "spiral" && (
+        <Spiral
+          {...common}
+          colorBack="#070810"
+          colorFront="#a78bfa"
+          density={0.7}
+          distortion={0.28}
+          strokeWidth={0.35}
+          strokeTaper={0.4}
+          strokeCap={0.2}
+          softness={0.6}
+          speed={speed * 0.45}
         />
       )}
       {visible && shader === "neuro" && (
         <NeuroNoise
           {...common}
-          colorFront="#dce7ff"
-          colorMid="#776bb4"
-          colorBack="#111827"
-          brightness={0.08}
-          contrast={0.34}
-          scale={1.45}
-          speed={speed * 0.8}
+          colorBack="#060913"
+          colorMid="#5b489d"
+          colorFront="#99baff"
+          brightness={0.06}
+          contrast={0.38}
+          scale={1.35}
+          speed={speed * 0.7}
         />
       )}
       {visible && shader === "grain" && (
         <GrainGradient
           {...common}
-          colorBack="#142b2a"
-          colors={["#e8b86d", "#3d8b79", "#725f9e"]}
-          softness={0.68}
-          intensity={0.48}
-          noise={0.34}
-          shape="blob"
-          scale={0.9}
-          speed={speed * 0.7}
+          colorBack="#0e1816"
+          colors={["#d9a066", "#2f8576", "#6c538a"]}
+          softness={0.72}
+          intensity={0.46}
+          noise={0.36}
+          shape="corners"
+          scale={0.95}
+          speed={speed * 0.65}
         />
       )}
       {visible && shader === "waves" && (
         <Waves
           {...common}
-          colorFront="#ece5d4"
-          colorBack="#17343b"
-          shape={2.07}
-          frequency={0.44}
-          amplitude={0.57}
-          spacing={1.05}
-          proportion={0.75}
-          softness={0.12}
-          scale={0.52}
+          colorBack="#0d1f24"
+          colorFront="#d8ede2"
+          shape={2.1}
+          frequency={0.35}
+          amplitude={0.48}
+          spacing={1.15}
+          proportion={0.7}
+          softness={0.3}
+          scale={0.55}
+          speed={speed * 0.5}
         />
       )}
       {visible && shader === "smoke" && (
         <SmokeRing
           {...common}
-          colorBack="#0c0e14"
-          colors={["#6e3c8e", "#2d6fa8", "#c46e3e"]}
-          noiseScale={1.4}
-          thickness={0.6}
-          radius={0.45}
-          speed={speed * 0.6}
+          colorBack="#06080e"
+          colors={["#3b4f6b", "#2c7a7b", "#81e6d9"]}
+          noiseScale={1.5}
+          thickness={0.55}
+          radius={0.42}
+          speed={speed * 0.55}
         />
       )}
       {visible && shader === "metaballs" && (
         <Metaballs
           {...common}
-          colorBack="#0b1220"
-          colors={["#ff6b4a", "#4ecdc4", "#ffe66d"]}
-          count={6}
-          size={0.62}
-          speed={speed * 0.7}
+          colorBack="#070b14"
+          colors={["#f472b6", "#38bdf8", "#818cf8"]}
+          count={5}
+          size={0.6}
+          speed={speed * 0.65}
         />
       )}
       {visible && shader === "godRays" && (
         <GodRays
           {...common}
-          colorBack="#08090d"
-          colorBloom="#3b2b1a"
-          colors={["#e8a547", "#d4593a", "#8b3a62"]}
-          spotty={0.5}
-          midSize={0.32}
-          midIntensity={0.55}
-          density={4.2}
-          intensity={0.42}
-          bloom={0.22}
-          speed={speed * 0.5}
+          colorBack="#07070a"
+          colorBloom="#302014"
+          colors={["#e2a45a", "#bf5e45", "#703554"]}
+          spotty={0.42}
+          midSize={0.35}
+          midIntensity={0.5}
+          density={3.6}
+          intensity={0.38}
+          bloom={0.3}
+          speed={speed * 0.45}
         />
       )}
       {visible && shader === "simplex" && (
         <SimplexNoise
           {...common}
-          colors={["#1a1a2e", "#16213e", "#0f3460", "#533483"]}
+          colors={["#0a192f", "#112240", "#1e3a5f", "#48cae4"]}
           stepsPerColor={4}
-          softness={0.6}
-          speed={speed * 0.5}
+          softness={0.65}
+          speed={speed * 0.45}
         />
       )}
       {visible && shader === "voronoi" && (
         <Voronoi
           {...common}
-          colors={["#1b1f3b", "#3a506b", "#5bc0be", "#0b132b"]}
+          colors={["#0c1220", "#1e293b", "#334155", "#0ea5e9"]}
           stepsPerColor={3}
-          colorGap="#0a0e1a"
-          colorGlow="#6fffe9"
-          distortion={0.3}
-          gap={0.04}
-          glow={0.25}
+          colorGap="#060910"
+          colorGlow="#38bdf8"
+          distortion={0.32}
+          gap={0.035}
+          glow={0.3}
           speed={speed * 0.4}
         />
       )}
       {visible && shader === "swirl" && (
         <Swirl
           {...common}
-          colorBack="#0a0a1a"
-          colors={["#f72585", "#7209b7", "#3a0ca3", "#4cc9f0"]}
-          bandCount={8}
-          twist={2.5}
-          center={0.3}
-          proportion={0.6}
-          softness={0.4}
+          colorBack="#060712"
+          colors={["#4338ca", "#6366f1", "#818cf8", "#c084fc"]}
+          bandCount={6}
+          twist={1.8}
+          center={0.28}
+          proportion={0.55}
+          softness={0.5}
           noiseFrequency={0.8}
-          noise={0.3}
-          speed={speed * 0.5}
+          noise={0.25}
+          speed={speed * 0.45}
         />
       )}
       {visible && shader === "warp" && (
         <Warp
           {...common}
-          colors={["#2d0a31", "#6b2d5b", "#c94c4c", "#f4a261", "#e9c46a"]}
-          rotation={0.4}
+          colors={["#150c20", "#2c153f", "#58205c", "#9f386c", "#e879a8"]}
+          rotation={0.35}
           proportion={0.5}
-          softness={0.6}
+          softness={0.65}
           shape="checks"
-          shapeScale={1.2}
-          distortion={0.7}
-          swirl={1.2}
-          swirlIterations={3}
-          speed={speed * 0.4}
+          shapeScale={1.1}
+          distortion={0.6}
+          swirl={0.8}
+          swirlIterations={2}
+          speed={speed * 0.38}
         />
       )}
       {visible && shader === "dotOrbit" && (
         <DotOrbit
           {...common}
-          colorBack="#0d1117"
-          colors={["#58a6ff", "#bc8cff", "#39d353", "#f78166"]}
-          size={0.55}
-          sizeRange={0.3}
-          spreading={0.6}
+          colorBack="#080c14"
+          colors={["#60a5fa", "#4ade80", "#fb923c", "#c084fc"]}
+          size={0.48}
+          sizeRange={0.25}
+          spreading={0.55}
           stepsPerColor={2}
-          speed={speed * 0.6}
+          speed={speed * 0.55}
         />
       )}
     </div>
@@ -2390,6 +2483,7 @@ function FontPicker({
 function CollectionPage() {
   const [collections, setCollections] = useState<Collection[]>([])
   const [syncedDevices, setSyncedDevices] = useState<SyncedDevice[]>([])
+  const [showSyncedTabs, setShowSyncedTabs] = useState(true)
   const [loading, setLoading] = useState(true)
   const [fontId, setFontId] = useState("system")
   const [fontScale, setFontScale] = useState(SCALE_DEFAULT)
@@ -2439,7 +2533,8 @@ function CollectionPage() {
         COLLECT_MODE_KEY,
         WINDOW_COLUMNS_KEY,
         COLLECTION_COLUMNS_KEY,
-        COLLECTION_SPANS_KEY
+        COLLECTION_SPANS_KEY,
+        SHOW_SYNCED_TABS_KEY
       ])
       .then((r) => {
         if (r.collections && Array.isArray(r.collections)) {
@@ -2501,6 +2596,8 @@ function CollectionPage() {
           r[COLLECTION_SPANS_KEY] !== null
         )
           setCollectionSpans(r[COLLECTION_SPANS_KEY])
+        if (typeof r[SHOW_SYNCED_TABS_KEY] === "boolean")
+          setShowSyncedTabs(r[SHOW_SYNCED_TABS_KEY])
       })
       .catch((err) => {
         console.error("[拾页] 异步数据解包异常:", err)
@@ -2622,6 +2719,13 @@ function CollectionPage() {
     playSound("toggle", soundEnabled)
     setWindowColumns(next)
     await chrome.storage.local.set({ [WINDOW_COLUMNS_KEY]: next })
+  }
+
+  const toggleShowSyncedTabs = async () => {
+    const next = !showSyncedTabs
+    playSound("toggle", soundEnabled)
+    setShowSyncedTabs(next)
+    await chrome.storage.local.set({ [SHOW_SYNCED_TABS_KEY]: next })
   }
 
   const getCollectionColumns = (id: string) =>
@@ -3167,6 +3271,15 @@ function CollectionPage() {
                 }></i>
             </NavBtn>
             <NavBtn
+              onClick={toggleShowSyncedTabs}
+              title={showSyncedTabs ? "隐藏其他设备同步标签" : "显示其他设备同步标签"}
+              active={showSyncedTabs}>
+              <i
+                className={
+                  showSyncedTabs ? "ri-device-fill" : "ri-device-line"
+                }></i>
+            </NavBtn>
+            <NavBtn
               onClick={() => setShowFontPanel((v) => !v)}
               title="外观与字体"
               active={showFontPanel}>
@@ -3338,7 +3451,7 @@ function CollectionPage() {
         )}
 
         {/* ── Synced Tabs ── */}
-        {!loading && syncedDevices.length > 0 && (
+        {!loading && showSyncedTabs && syncedDevices.length > 0 && (
           <>
             <div
               style={{
