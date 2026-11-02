@@ -63,8 +63,8 @@ async function collectAllWindows() {
   const existing: Collection[] = result.collections || []
   const savedUrls = new Set(existing.flatMap((c) => c.tabs.map((t) => t.url)))
 
-  // All tabs across all windows
-  const allTabs = await chrome.tabs.query({})
+  // All unpinned tabs across all windows
+  const allTabs = await chrome.tabs.query({ pinned: false })
 
   // All windows in order
   const allWindows = await chrome.windows.getAll({ populate: false })
@@ -143,8 +143,10 @@ async function collectCurrentWindow() {
   const currentWindow = await chrome.windows.getCurrent({ populate: true })
   if (!currentWindow.id || !currentWindow.tabs) return
 
+  const unpinnedTabs = currentWindow.tabs.filter((tab) => !tab.pinned)
+
   const now = Date.now()
-  const validTabs = currentWindow.tabs
+  const validTabs = unpinnedTabs
     .filter((tab) => {
       if (!tab.url || !isCollectable(tab.url)) return false
       if (savedUrls.has(tab.url)) return false
@@ -170,8 +172,8 @@ async function collectCurrentWindow() {
   // Open collection page in the same window
   const newTab = await chrome.tabs.create({ url: collectionUrl, active: true })
 
-  // Close other tabs in this window only
-  const tabIdsToClose = currentWindow.tabs
+  // Close other unpinned tabs in this window only
+  const tabIdsToClose = unpinnedTabs
     .filter((tab) => tab.id !== undefined && tab.id !== newTab.id)
     .map((tab) => tab.id!)
 
