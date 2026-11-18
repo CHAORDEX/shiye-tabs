@@ -1234,3 +1234,311 @@ html[data-theme="dark"] .kt-collection-card[data-card-style="classic"] .kt-card-
   break-inside: avoid;
   margin-bottom: 12px;
 }
+
+/* ── Guide interactive stage (StageShow style) ───────────────── */
+.sg-stage-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-m);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.sg-viewport {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: radial-gradient(circle at 50% 0%, var(--accent-bg), transparent 68%), var(--bg2);
+  padding: 22px 20px 20px;
+  overflow: hidden;
+}
+
+.sg-browser {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-l);
+  overflow: hidden;
+}
+
+.sg-browser-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  min-height: 42px;
+}
+
+.sg-traffic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 11px;
+  flex-shrink: 0;
+}
+
+.sg-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--border2);
+}
+
+.sg-tabs-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sg-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px 8px 0 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+  max-width: 145px;
+  transition:
+    transform 460ms cubic-bezier(.22, 1, .36, 1),
+    opacity 360ms ease,
+    max-width 460ms cubic-bezier(.22, 1, .36, 1),
+    padding 460ms cubic-bezier(.22, 1, .36, 1);
+  transform-origin: right center;
+}
+
+.sg-tab.is-active {
+  background: var(--card);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sg-tab.is-collapsed {
+  opacity: 0;
+  transform: translateX(48px) scale(.65);
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-width: 0;
+}
+
+.sg-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sg-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.sg-omnibox {
+  flex: 1;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
+.sg-ext-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: transform 180ms ease, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.sg-ext-btn.is-pressed {
+  transform: scale(.9);
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.sg-browser-body {
+  position: relative;
+  height: 214px;
+  background: var(--bg);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.sg-mock-page {
+  position: absolute;
+  inset: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 380ms ease, transform 420ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.sg-mock-page.is-hidden {
+  opacity: 0;
+  transform: scale(.96);
+  pointer-events: none;
+}
+
+.sg-collection-view {
+  position: absolute;
+  inset: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: opacity 420ms ease, transform 480ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.sg-collection-view.is-hidden {
+  opacity: 0;
+  transform: translateY(14px) scale(.97);
+  pointer-events: none;
+}
+
+.sg-demo-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-s);
+  padding: 12px 14px;
+  transition: border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+}
+
+.sg-demo-card.is-restoring {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg), var(--shadow-m);
+}
+
+.sg-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: transform 160ms ease, background 180ms ease, box-shadow 220ms ease;
+}
+
+.sg-restore-btn.is-pressed {
+  transform: scale(.92);
+  background: var(--accent2);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+
+.sg-cursor {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  transition:
+    left 720ms cubic-bezier(.22, 1, .36, 1),
+    top 720ms cubic-bezier(.22, 1, .36, 1),
+    opacity 260ms ease,
+    transform 150ms ease;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .24));
+}
+
+.sg-cursor.is-clicking {
+  transform: scale(.84);
+}
+
+.sg-ripple {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  transform: translate(-50%, -50%) scale(.3);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sg-ripple.is-active {
+  animation: sg-ripple-pop 540ms ease-out forwards;
+}
+
+@keyframes sg-ripple-pop {
+  0% { opacity: .85; transform: translate(-50%, -50%) scale(.35); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+}
+
+.sg-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 680px) {
+  .sg-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sg-step-btn {
+  position: relative;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  padding: 11px 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: border-color 200ms ease, background 200ms ease, transform 180ms ease;
+  overflow: hidden;
+}
+
+.sg-step-btn:hover {
+  border-color: var(--border2);
+  background: var(--card-h);
+}
+
+.sg-step-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.sg-step-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  animation: sg-progress linear forwards;
+}
+
+@keyframes sg-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
