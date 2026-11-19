@@ -13,6 +13,7 @@ import "remixicon/fonts/remixicon.css"
 import "../contents/link-hints"
 import "../style.css"
 
+import { AvantShaderCanvas, type AvantShaderId } from "./avant-shaders"
 import {
   estimateTabTarget,
   initSmoothCursor,
@@ -63,12 +64,22 @@ function normalizeCardStyle(value?: string): CardStyle {
   return LEGACY_CARD_STYLE_MAP[value] ?? "classic"
 }
 type CardShader =
+  | AvantShaderId
   | "mesh"
   | "grain"
   | "warp"
   | "simplex"
   | "water"
   | "liquidMetal"
+
+function isAvantShader(shader: CardShader): shader is AvantShaderId {
+  return (
+    shader === "inkWash" ||
+    shader === "causticPrism" ||
+    shader === "topoContour" ||
+    shader === "ferrofluid"
+  )
+}
 
 const LEGACY_CARD_SHADER_MAP: Record<string, CardShader> = {
   godRays: "mesh",
@@ -206,7 +217,36 @@ const CARD_SHADERS: Array<{
   name: string
   description: string
   tone: "light" | "dark"
+  experimental?: boolean
 }> = [
+  {
+    id: "inkWash",
+    name: "泼墨宣纸",
+    description: "水墨洇染 · 指针笔锋涟漪",
+    tone: "light",
+    experimental: true
+  },
+  {
+    id: "causticPrism",
+    name: "棱镜色散",
+    description: "长虹玻璃 · 指针折射光谱",
+    tone: "light",
+    experimental: true
+  },
+  {
+    id: "topoContour",
+    name: "等高地形",
+    description: "动态等高线 · 磁力隆起",
+    tone: "dark",
+    experimental: true
+  },
+  {
+    id: "ferrofluid",
+    name: "黑磁流体",
+    description: "暗银波峰 · 指针磁铁吸引",
+    tone: "dark",
+    experimental: true
+  },
   { id: "mesh", name: "暮色织网", description: "暖陶与深靛 · 全幅慢涌", tone: "dark" },
   { id: "grain", name: "晨雾宣纸", description: "浅色流光 · 暖米胶片晕", tone: "light" },
   { id: "warp", name: "绛紫丝绸", description: "暗绒幕布 · 丝滑曲面光", tone: "dark" },
@@ -374,6 +414,10 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
   }
 
   const shaderBg: Record<CardShader, string> = {
+    inkWash: "#f5f1e8",
+    causticPrism: "#f3f5f8",
+    topoContour: "#101113",
+    ferrofluid: "#0e0f12",
     mesh: "#0e1522",
     grain: "#f4efe6",
     warp: "#170e1c",
@@ -405,6 +449,13 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
       className="kt-paper-shader"
       data-shader={shader}
       data-shader-tone={getShaderTone(shader)}>
+      {isAvantShader(shader) && (
+        <AvantShaderCanvas
+          shader={shader}
+          visible={visible}
+          reduceMotion={reduceMotion}
+        />
+      )}
       {visible && shader === "mesh" && (
         <MeshGradient
           {...common}
@@ -1344,9 +1395,42 @@ function CollectionCard({
                 )}
 
                 {appearanceTab === "shader" && (
-                  <div>
+                  <div className="sy-ap-scroll">
+                    <div className="sy-ap-section-head">
+                      <span>先锋实验 · 指针交互</span>
+                      <span className="sy-lab-tag">LAB</span>
+                    </div>
                     <div className="kt-shader-grid">
-                      {CARD_SHADERS.map((shader) => (
+                      {CARD_SHADERS.filter((s) => s.experimental).map((shader) => (
+                        <button
+                          key={shader.id}
+                          type="button"
+                          title={`${shader.name} · ${shader.description}`}
+                          className={`kt-shader-option${cardShader === shader.id ? " active" : ""}`}
+                          onClick={() =>
+                            onAppearanceChange({
+                              backgroundImage: "",
+                              cardShader: shader.id
+                            })
+                          }>
+                          <span
+                            className="kt-shader-preview"
+                            data-shader-preview={shader.id}>
+                            <span />
+                          </span>
+                          <span className="kt-style-name">{shader.name}</span>
+                          <span className="kt-style-description">
+                            {shader.description}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="sy-ap-section-head" style={{ marginTop: 12 }}>
+                      <span>经典流光</span>
+                    </div>
+                    <div className="kt-shader-grid">
+                      {CARD_SHADERS.filter((s) => !s.experimental).map((shader) => (
                         <button
                           key={shader.id}
                           type="button"
@@ -1375,7 +1459,7 @@ function CollectionCard({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        marginTop: 8
+                        marginTop: 10
                       }}>
                       <a
                         className="kt-paper-credit"
@@ -1383,7 +1467,7 @@ function CollectionCard({
                         href="https://shaders.paper.design"
                         target="_blank"
                         rel="noreferrer">
-                        Powered by Paper Shaders
+                        GLSL Lab + Paper Shaders
                       </a>
                       {appearanceMode === "shader" && (
                         <button

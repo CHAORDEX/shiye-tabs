@@ -886,6 +886,10 @@ html[data-theme="dark"] .kt-collection-card[data-card-style="glass"] .kt-card-vi
 .kt-paper-shader[data-shader-tone="dark"] {
   filter: saturate(0.92) brightness(0.88);
 }
+.kt-paper-shader[data-shader="inkWash"] { background: radial-gradient(circle at 30% 30%, #dad6ce, #f5f1e8 72%); }
+.kt-paper-shader[data-shader="causticPrism"] { background: repeating-linear-gradient(90deg, #f3f5f8 0 6px, #e7edf4 6px 8px, #f6f3f8 8px 12px); }
+.kt-paper-shader[data-shader="topoContour"] { background: radial-gradient(circle at 60% 40%, #24262b, #101113 75%); }
+.kt-paper-shader[data-shader="ferrofluid"] { background: radial-gradient(circle at 45% 40%, #3a424d, #0e0f12 75%); }
 .kt-paper-shader[data-shader="mesh"] { background: linear-gradient(135deg, #0f1828, #1d3a52 45%, #8f4a3a 80%, #c9855a); }
 .kt-paper-shader[data-shader="grain"] { background: radial-gradient(circle at 20% 20%, #e8c8b0, #c9d9c8 50%, #f5f0e7 85%); }
 .kt-paper-shader[data-shader="warp"] { background: linear-gradient(135deg, #160e1d, #2c1738 40%, #51234a 72%, #7e3758); }
@@ -1121,6 +1125,71 @@ html[data-theme="dark"] .kt-collection-card[data-card-style="glass"] .kt-card-vi
   line-height: 1.2;
 }
 .kt-appearance-divider { height: 1px; margin: 12px 0; background: var(--border); }
+.sy-ap-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.sy-ap-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+}
+.sy-lab-tag {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid rgba(217, 119, 86, 0.25);
+}
+.kt-shader-preview[data-shader-preview="inkWash"] {
+  background:
+    radial-gradient(ellipse at 28% 35%, rgba(135, 134, 128, 0.48), transparent 56%),
+    radial-gradient(ellipse at 74% 62%, rgba(217, 119, 86, 0.22), transparent 52%),
+    #f5f1e8;
+}
+.kt-shader-preview[data-shader-preview="inkWash"] span {
+  background: rgba(30, 29, 26, 0.16);
+}
+.kt-shader-preview[data-shader-preview="causticPrism"] {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.72) 0 4px,
+      rgba(147, 197, 253, 0.28) 4px 5px,
+      rgba(244, 162, 140, 0.22) 5px 6px,
+      rgba(235, 241, 248, 0.7) 6px 9px
+    ),
+    #f3f5f8;
+}
+.kt-shader-preview[data-shader-preview="causticPrism"] span {
+  background: rgba(24, 34, 48, 0.12);
+}
+.kt-shader-preview[data-shader-preview="topoContour"] {
+  background:
+    repeating-radial-gradient(
+      circle at 62% 45%,
+      transparent 0 5px,
+      rgba(217, 119, 86, 0.52) 5px 6px,
+      transparent 6px 11px,
+      rgba(148, 163, 184, 0.34) 11px 12px
+    ),
+    #101113;
+}
+.kt-shader-preview[data-shader-preview="ferrofluid"] {
+  background:
+    radial-gradient(circle at 38% 36%, rgba(176, 196, 218, 0.72), transparent 28%),
+    radial-gradient(circle at 68% 58%, rgba(214, 143, 108, 0.45), transparent 34%),
+    radial-gradient(circle at 50% 50%, #242932, #0c0d10 72%);
+}
 .kt-shader-preview[data-shader-preview="mesh"] {
   background: linear-gradient(135deg, #0f1828, #1d3a52 45%, #8f4a3a 78%, #c9855a);
 }
