@@ -3,20 +3,10 @@ import { useEffect, useRef, useState } from "react"
 import {
   GrainGradient,
   MeshGradient,
-  NeuroNoise,
-  Waves,
-  SmokeRing,
-  Metaballs,
-  GodRays,
   SimplexNoise,
-  Voronoi,
-  Swirl,
   Warp,
-  DotOrbit,
   LiquidMetal,
-  Water,
-  Dithering,
-  Spiral
+  Water
 } from "@paper-design/shaders-react"
 
 import "remixicon/fonts/remixicon.css"
@@ -35,24 +25,63 @@ import { playScrollGear, playSound } from "./sounds"
 /* ── Types ──────────────────────────────────────────────────── */
 type Theme = "light" | "dark" | "auto"
 type DomainSortOrder = "asc" | "desc"
-type CardStyle = "classic" | "paper" | "glass" | "noir" | "aurora" | "ocean" | "sunset" | "lavender" | "forest" | "rose" | "slate" | "amber"
+type CardStyle =
+  | "classic"
+  | "paper"
+  | "editorial"
+  | "blueprint"
+  | "terminal"
+  | "glass"
+  | "noir"
+  | "botanical"
+
+const LEGACY_CARD_STYLE_MAP: Record<string, CardStyle> = {
+  ocean: "blueprint",
+  forest: "terminal",
+  slate: "editorial",
+  aurora: "botanical",
+  lavender: "glass",
+  sunset: "paper",
+  rose: "paper",
+  amber: "noir"
+}
+
+function normalizeCardStyle(value?: string): CardStyle {
+  if (!value) return "classic"
+  if (
+    value === "classic" ||
+    value === "paper" ||
+    value === "editorial" ||
+    value === "blueprint" ||
+    value === "terminal" ||
+    value === "glass" ||
+    value === "noir" ||
+    value === "botanical"
+  ) {
+    return value
+  }
+  return LEGACY_CARD_STYLE_MAP[value] ?? "classic"
+}
 type CardShader =
-  | "liquidMetal"
-  | "water"
   | "mesh"
-  | "dithering"
-  | "spiral"
-  | "neuro"
   | "grain"
-  | "waves"
-  | "smoke"
-  | "metaballs"
-  | "godRays"
-  | "simplex"
-  | "voronoi"
-  | "swirl"
   | "warp"
-  | "dotOrbit"
+  | "simplex"
+  | "water"
+  | "liquidMetal"
+
+const LEGACY_CARD_SHADER_MAP: Record<string, CardShader> = {
+  godRays: "mesh",
+  dithering: "simplex",
+  spiral: "warp",
+  neuro: "warp",
+  waves: "water",
+  smoke: "simplex",
+  metaballs: "mesh",
+  voronoi: "simplex",
+  swirl: "warp",
+  dotOrbit: "liquidMetal"
+}
 
 interface DraggedTab {
   colId: string
@@ -162,42 +191,33 @@ const CARD_STYLES: Array<{
   name: string
   description: string
 }> = [
-  { id: "classic", name: "清简", description: "凝炼白瓷与极简空间" },
-  { id: "paper", name: "和纸", description: "手工纸感与朱砂茶韵" },
-  { id: "glass", name: "雾玻", description: "通透磨砂晶体折射" },
-  { id: "noir", name: "夜幕", description: "黑曜石与拉丝暖金" },
-  { id: "aurora", name: "极光", description: "北欧幽夜薄荷流芒" },
-  { id: "ocean", name: "深海", description: "马里亚纳冷澈蔚蓝" },
-  { id: "sunset", name: "暮霞", description: "加州黄昏落日金晕" },
-  { id: "lavender", name: "薰衣", description: "柔雾淡紫与云母珠光" },
-  { id: "forest", name: "森丘", description: "高山冷杉与深林青苔" },
-  { id: "rose", name: "暗玫", description: "丝绒浆果与现代黑粉" },
-  { id: "slate", name: "玄岩", description: "冰岛玄武岩冷峻格调" },
-  { id: "amber", name: "琥珀", description: "陈年蜜蜡与威士忌光" }
+  { id: "classic", name: "素瓷", description: "极简白瓷 · 跟随明暗" },
+  { id: "paper", name: "宣纸", description: "暖米纸纹 · 朱砂书签" },
+  { id: "editorial", name: "刊物", description: "瑞士墨框 · 印刷硬影" },
+  { id: "blueprint", name: "蓝图", description: "普鲁士蓝 · 工程方格" },
+  { id: "terminal", name: "终端", description: "哑光炭黑 · 极客翡翠" },
+  { id: "glass", name: "冰雾", description: "通透磨砂 · 折射白边" },
+  { id: "noir", name: "曜石", description: "纯黑拉丝 · 香槟金线" },
+  { id: "botanical", name: "苔原", description: "鼠尾草绿 · 亚麻护眼" }
 ]
 
 const CARD_SHADERS: Array<{
   id: CardShader
   name: string
   description: string
+  tone: "light" | "dark"
 }> = [
-  { id: "liquidMetal", name: "液态水银", description: "流体金属镜面反光" },
-  { id: "water", name: "浮光澄水", description: "清澈焦散自然水波" },
-  { id: "mesh", name: "暮色织网", description: "极光柔光多维流转" },
-  { id: "dithering", name: "数字点阵", description: "现代极客复古波纹" },
-  { id: "spiral", name: "几何螺线", description: "数学螺线极简光轨" },
-  { id: "neuro", name: "星云脉冲", description: "深空有机呼吸微光" },
-  { id: "grain", name: "胶片潮汐", description: "温润胶片颗粒流晕" },
-  { id: "waves", name: "静谧波澜", description: "丝绢般起伏的涟漪" },
-  { id: "smoke", name: "幽夜冷雾", description: "如缕轻盈烟岚流散" },
-  { id: "metaballs", name: "流光融球", description: "晶莹有机融球律动" },
-  { id: "godRays", name: "晨曦天光", description: "丁达尔神圣漫射光" },
-  { id: "simplex", name: "晶核流光", description: "深邃晶格波函数微澜" },
-  { id: "voronoi", name: "泰森微晶", description: "几何晶石切面光晕" },
-  { id: "swirl", name: "引力星旋", description: "深邃星际双色涡流" },
-  { id: "warp", name: "极光织锦", description: "柔和流动空间曲面" },
-  { id: "dotOrbit", name: "天体引力", description: "克制纯粹的公转轨迹" }
+  { id: "mesh", name: "暮色织网", description: "暖陶与深靛 · 全幅慢涌", tone: "dark" },
+  { id: "grain", name: "晨雾宣纸", description: "浅色流光 · 暖米胶片晕", tone: "light" },
+  { id: "warp", name: "绛紫丝绸", description: "暗绒幕布 · 丝滑曲面光", tone: "dark" },
+  { id: "simplex", name: "深海潮汐", description: "北欧蓝绿 · 静谧低频流", tone: "dark" },
+  { id: "water", name: "澄澈水波", description: "深青水纹 · 柔和焦散光", tone: "dark" },
+  { id: "liquidMetal", name: "液态银灰", description: "冷感金属 · 极简柔光面", tone: "dark" }
 ]
+
+function getShaderTone(shader: CardShader): "light" | "dark" {
+  return CARD_SHADERS.find((s) => s.id === shader)?.tone ?? "dark"
+}
 
 /** 打开标签时的光束动画默认开启 */
 const BEAM_DEFAULT = true
@@ -274,9 +294,11 @@ function backgroundImageValue(url: string): string {
 }
 
 function normalizeCardShader(value: unknown): CardShader | null {
-  return CARD_SHADERS.some((shader) => shader.id === value)
-    ? (value as CardShader)
-    : null
+  if (typeof value !== "string" || !value) return null
+  if (CARD_SHADERS.some((shader) => shader.id === value)) {
+    return value as CardShader
+  }
+  return LEGACY_CARD_SHADER_MAP[value] ?? null
 }
 
 async function compressBackgroundImage(file: File): Promise<string> {
@@ -352,22 +374,12 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
   }
 
   const shaderBg: Record<CardShader, string> = {
-    liquidMetal: "#07090e",
-    water: "#061220",
-    mesh: "#080d1a",
-    dithering: "#080c14",
-    spiral: "#070810",
-    neuro: "#060913",
-    grain: "#0e1816",
-    waves: "#0d1f24",
-    smoke: "#06080e",
-    metaballs: "#070b14",
-    godRays: "#07070a",
-    simplex: "#0a192f",
-    voronoi: "#0c1220",
-    swirl: "#060712",
-    warp: "#150c20",
-    dotOrbit: "#080c14"
+    mesh: "#0e1522",
+    grain: "#f4efe6",
+    warp: "#170e1c",
+    simplex: "#0b1a24",
+    water: "#081722",
+    liquidMetal: "#111318"
   }
 
   const common = {
@@ -375,6 +387,7 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
     style: { background: shaderBg[shader] },
     width: "100%",
     height: "100%",
+    fit: "cover" as const,
     minPixelRatio: 1,
     maxPixelCount: 480000,
     webGlContextAttributes: {
@@ -384,216 +397,94 @@ function CardShaderBackground({ shader }: { shader: CardShader }) {
       powerPreference: "low-power" as WebGLPowerPreference
     }
   }
-  const speed = reduceMotion ? 0 : 0.18
+  const speed = reduceMotion ? 0 : 0.14
 
   return (
     <div
       ref={containerRef}
       className="kt-paper-shader"
-      data-shader={shader}>
-      {visible && shader === "liquidMetal" && (
-        <LiquidMetal
-          {...common}
-          colorBack="#07090e"
-          colorTint="#b4d4f8"
-          shape="none"
-          repetition={1.8}
-          distortion={0.12}
-          softness={0.25}
-          shiftRed={0.3}
-          shiftBlue={-0.2}
-          contour={0.3}
-          angle={105}
-          speed={speed * 0.7}
-        />
-      )}
-      {visible && shader === "water" && (
-        <Water
-          {...common}
-          colorBack="#061220"
-          colorHighlight="#6ae4f2"
-          highlights={0.25}
-          layering={0.4}
-          caustic={0.24}
-          waves={0.35}
-          size={0.85}
-          speed={speed * 0.65}
-        />
-      )}
+      data-shader={shader}
+      data-shader-tone={getShaderTone(shader)}>
       {visible && shader === "mesh" && (
         <MeshGradient
           {...common}
-          colors={["#080d1a", "#153347", "#c26359", "#f5c589"]}
-          distortion={0.78}
-          swirl={0.35}
-          grainMixer={0.2}
-          grainOverlay={0.12}
-          speed={speed * 0.8}
-        />
-      )}
-      {visible && shader === "dithering" && (
-        <Dithering
-          {...common}
-          colorBack="#080c14"
-          colorFront="#60a5fa"
-          shape="warp"
-          type="4x4"
-          size={2.2}
-          speed={speed * 0.5}
-        />
-      )}
-      {visible && shader === "spiral" && (
-        <Spiral
-          {...common}
-          colorBack="#070810"
-          colorFront="#a78bfa"
-          density={0.7}
-          distortion={0.28}
-          strokeWidth={0.35}
-          strokeTaper={0.4}
-          strokeCap={0.2}
-          softness={0.6}
-          speed={speed * 0.45}
-        />
-      )}
-      {visible && shader === "neuro" && (
-        <NeuroNoise
-          {...common}
-          colorBack="#060913"
-          colorMid="#5b489d"
-          colorFront="#99baff"
-          brightness={0.06}
-          contrast={0.38}
-          scale={1.35}
-          speed={speed * 0.7}
+          colors={["#0f1828", "#1d3a52", "#8f4a3a", "#c9855a"]}
+          distortion={0.62}
+          swirl={0.28}
+          grainMixer={0.14}
+          grainOverlay={0.08}
+          scale={1.25}
+          speed={speed * 0.85}
         />
       )}
       {visible && shader === "grain" && (
         <GrainGradient
           {...common}
-          colorBack="#0e1816"
-          colors={["#d9a066", "#2f8576", "#6c538a"]}
-          softness={0.72}
-          intensity={0.46}
-          noise={0.36}
+          colorBack="#f5f0e7"
+          colors={["#e8c8b0", "#c9d9c8", "#ded3e6"]}
+          softness={0.86}
+          intensity={0.34}
+          noise={0.2}
           shape="corners"
-          scale={0.95}
-          speed={speed * 0.65}
-        />
-      )}
-      {visible && shader === "waves" && (
-        <Waves
-          {...common}
-          colorBack="#0d1f24"
-          colorFront="#d8ede2"
-          shape={2.1}
-          frequency={0.35}
-          amplitude={0.48}
-          spacing={1.15}
-          proportion={0.7}
-          softness={0.3}
-          scale={0.55}
-          speed={speed * 0.5}
-        />
-      )}
-      {visible && shader === "smoke" && (
-        <SmokeRing
-          {...common}
-          colorBack="#06080e"
-          colors={["#3b4f6b", "#2c7a7b", "#81e6d9"]}
-          noiseScale={1.5}
-          thickness={0.55}
-          radius={0.42}
-          speed={speed * 0.55}
-        />
-      )}
-      {visible && shader === "metaballs" && (
-        <Metaballs
-          {...common}
-          colorBack="#070b14"
-          colors={["#f472b6", "#38bdf8", "#818cf8"]}
-          count={5}
-          size={0.6}
-          speed={speed * 0.65}
-        />
-      )}
-      {visible && shader === "godRays" && (
-        <GodRays
-          {...common}
-          colorBack="#07070a"
-          colorBloom="#302014"
-          colors={["#e2a45a", "#bf5e45", "#703554"]}
-          spotty={0.42}
-          midSize={0.35}
-          midIntensity={0.5}
-          density={3.6}
-          intensity={0.38}
-          bloom={0.3}
-          speed={speed * 0.45}
-        />
-      )}
-      {visible && shader === "simplex" && (
-        <SimplexNoise
-          {...common}
-          colors={["#0a192f", "#112240", "#1e3a5f", "#48cae4"]}
-          stepsPerColor={4}
-          softness={0.65}
-          speed={speed * 0.45}
-        />
-      )}
-      {visible && shader === "voronoi" && (
-        <Voronoi
-          {...common}
-          colors={["#0c1220", "#1e293b", "#334155", "#0ea5e9"]}
-          stepsPerColor={3}
-          colorGap="#060910"
-          colorGlow="#38bdf8"
-          distortion={0.32}
-          gap={0.035}
-          glow={0.3}
-          speed={speed * 0.4}
-        />
-      )}
-      {visible && shader === "swirl" && (
-        <Swirl
-          {...common}
-          colorBack="#060712"
-          colors={["#4338ca", "#6366f1", "#818cf8", "#c084fc"]}
-          bandCount={6}
-          twist={1.8}
-          center={0.28}
-          proportion={0.55}
-          softness={0.5}
-          noiseFrequency={0.8}
-          noise={0.25}
-          speed={speed * 0.45}
+          scale={1.45}
+          speed={speed * 0.75}
         />
       )}
       {visible && shader === "warp" && (
         <Warp
           {...common}
-          colors={["#150c20", "#2c153f", "#58205c", "#9f386c", "#e879a8"]}
-          rotation={0.35}
-          proportion={0.5}
-          softness={0.65}
+          colors={["#160e1d", "#2c1738", "#51234a", "#7e3758"]}
+          rotation={0.25}
+          proportion={0.48}
+          softness={0.86}
           shape="checks"
-          shapeScale={1.1}
-          distortion={0.6}
-          swirl={0.8}
+          shapeScale={0.8}
+          distortion={0.48}
+          swirl={0.55}
           swirlIterations={2}
-          speed={speed * 0.38}
+          scale={1.35}
+          speed={speed * 0.65}
         />
       )}
-      {visible && shader === "dotOrbit" && (
-        <DotOrbit
+      {visible && shader === "simplex" && (
+        <SimplexNoise
           {...common}
-          colorBack="#080c14"
-          colors={["#60a5fa", "#4ade80", "#fb923c", "#c084fc"]}
-          size={0.48}
-          sizeRange={0.25}
-          spreading={0.55}
-          stepsPerColor={2}
-          speed={speed * 0.55}
+          colors={["#0b1822", "#122a3a", "#1c4356", "#2f6b7d"]}
+          stepsPerColor={4}
+          softness={0.88}
+          scale={1.2}
+          speed={speed * 0.65}
+        />
+      )}
+      {visible && shader === "water" && (
+        <Water
+          {...common}
+          colorBack="#081722"
+          colorHighlight="#58b9cc"
+          highlights={0.14}
+          layering={0.36}
+          caustic={0.16}
+          waves={0.28}
+          size={1.05}
+          scale={1.4}
+          speed={speed * 0.7}
+        />
+      )}
+      {visible && shader === "liquidMetal" && (
+        <LiquidMetal
+          {...common}
+          colorBack="#111318"
+          colorTint="#9db0c4"
+          shape="none"
+          repetition={1.4}
+          distortion={0.1}
+          softness={0.42}
+          shiftRed={0.12}
+          shiftBlue={-0.12}
+          contour={0.22}
+          angle={115}
+          scale={1.65}
+          speed={speed * 0.7}
         />
       )}
     </div>
@@ -866,10 +757,10 @@ function TabItem({
   onDragEnd: () => void
   onDrop: (e: React.DragEvent) => void
 }) {
-  const [h, setH] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
   const favicon = getFavicon(tab.url)
+  const host = getDomain(tab.url)
   const isMasked = Boolean(tab.maskedTitle)
   const displayTitle = tab.maskedTitle ?? tab.title
 
@@ -897,6 +788,7 @@ function TabItem({
   return (
     <div
       ref={rowRef}
+      className={`sy-tab-row${dragOver ? " is-drag-over" : ""}`}
       title={isMasked ? "（真实标题已隐藏）" : tab.url}
       draggable
       onDragStart={onDragStart}
@@ -917,38 +809,19 @@ function TabItem({
         onDrop(e)
       }}
       onMouseEnter={() => {
-        setH(true)
         playSound("hover", soundEnabled)
       }}
-      onMouseLeave={() => setH(false)}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "7px 10px",
-        borderRadius: 7,
-        background: dragOver ? "var(--accent-bg)" : h ? "var(--bg2)" : "transparent",
-        outline: dragOver ? "1px dashed var(--accent)" : "none",
         opacity: dragging ? 0.42 : 1,
-        transition: "background var(--dur) var(--ease), opacity var(--dur) var(--ease)",
-        cursor: dragging ? "grabbing" : "grab",
-        minWidth: 0
+        cursor: dragging ? "grabbing" : "grab"
       }}>
       {/* Favicon */}
-      <div
-        style={{
-          width: 16,
-          height: 16,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
+      <div className="sy-favicon-box">
         {favicon ? (
           <img
             src={favicon}
             alt=""
-            style={{ width: 15, height: 15, borderRadius: 3, opacity: 0.82 }}
+            style={{ width: 14, height: 14, borderRadius: 3, opacity: 0.9 }}
             onError={(e) => {
               ;(e.currentTarget as HTMLImageElement).style.display = "none"
             }}
@@ -956,8 +829,8 @@ function TabItem({
         ) : (
           <div
             style={{
-              width: 9,
-              height: 9,
+              width: 7,
+              height: 7,
               borderRadius: "50%",
               background: "var(--border2)"
             }}
@@ -970,7 +843,7 @@ function TabItem({
         style={{
           flex: 1,
           minWidth: 0,
-          fontSize: fs(14),
+          fontSize: fs(13.5),
           fontWeight: "var(--fw)",
           color: isMasked ? "var(--text2)" : "var(--text)",
           overflow: "hidden",
@@ -981,15 +854,14 @@ function TabItem({
         {displayTitle}
       </span>
 
-      {/* Actions — visible on row hover or when locked/masked */}
+      {/* Subtle host label when not masked */}
+      {!isMasked && host && (
+        <span className="sy-tab-host">{host}</span>
+      )}
+
+      {/* Actions — floating capsule on row hover or when locked/masked */}
       <div
-        style={{
-          display: "flex",
-          gap: 2,
-          flexShrink: 0,
-          opacity: tab.locked || isMasked ? 1 : h ? 1 : 0,
-          transition: "opacity var(--dur) var(--ease)"
-        }}>
+        className={`sy-tab-actions${tab.locked || isMasked ? " is-pinned" : ""}`}>
         <IconBtn
           onClick={(e) => {
             e.stopPropagation()
@@ -1058,7 +930,8 @@ function CollectionCard({
   onAppearanceChange,
   onToggleLock,
   onToggleTabLock,
-  onToggleTabMaskTitle
+  onToggleTabMaskTitle,
+  searchQuery = ""
 }: {
   collection: Collection
   otherCollections: Collection[]
@@ -1091,6 +964,7 @@ function CollectionCard({
   onToggleLock: () => void
   onToggleTabLock: (tabIndex: number) => void
   onToggleTabMaskTitle: (tabIndex: number) => void
+  searchQuery?: string
 }) {
   const [hCard, setHCard] = useState(false)
   const [isBlurred, setIsBlurred] = useState(false)
@@ -1188,7 +1062,7 @@ function CollectionCard({
 
   const [isResizing, setIsResizing] = useState(false)
   const [liveSpan, setLiveSpan] = useState<number | null>(null)
-  const cardStyle = collection.cardStyle ?? "classic"
+  const cardStyle = normalizeCardStyle(collection.cardStyle)
   const hasCustomBackground = Boolean(collection.backgroundImage)
   const cardShader = normalizeCardShader(collection.cardShader)
   const appearanceMode = cardShader
@@ -1196,6 +1070,9 @@ function CollectionCard({
     : hasCustomBackground
       ? "image"
       : "theme"
+  const [appearanceTab, setAppearanceTab] = useState<"theme" | "shader" | "image">(
+    appearanceMode
+  )
 
   const handleCornerMouseDown = (
     e: React.MouseEvent,
@@ -1274,17 +1151,35 @@ function CollectionCard({
     onResetSpan()
   }
 
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const allIndexedTabs = (collection.tabs || []).map((tab, index) => ({
+    tab,
+    index
+  }))
+  const visibleTabs = normalizedQuery
+    ? allIndexedTabs.filter(({ tab }) => {
+        const hay = `${tab.title} ${tab.maskedTitle ?? ""} ${tab.url}`.toLowerCase()
+        return hay.includes(normalizedQuery)
+      })
+    : allIndexedTabs
+  const hasOpenMenu = showMergeMenu || showGatherMenu || showAppearancePanel
+
   return (
     <div
       ref={cardRef}
       className={`kt-collection-card${splitAnimating ? " kt-card-split-born" : ""}${isBlurred ? " is-blurred" : ""}${isResizing ? " is-resizing" : ""}`}
       data-card-style={appearanceMode === "theme" ? cardStyle : undefined}
       data-card-mode={appearanceMode}
+      data-shader-tone={
+        appearanceMode === "shader" && cardShader
+          ? getShaderTone(cardShader)
+          : undefined
+      }
       onMouseEnter={() => setHCard(true)}
       onMouseLeave={() => setHCard(false)}
       style={{
         position: "relative",
-        zIndex: showMergeMenu || showGatherMenu || showAppearancePanel ? 100 : 1,
+        zIndex: hasOpenMenu ? 100 : 1,
         background: "var(--card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--r)",
@@ -1319,27 +1214,27 @@ function CollectionCard({
           borderTopLeftRadius: "max(0px, calc(var(--r) - 1px))",
           borderTopRightRadius: "max(0px, calc(var(--r) - 1px))"
         }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflow: "hidden"
-          }}>
+        <div className="sy-card-meta">
           <span
             className={`kt-card-badge-btn${isBlurred ? " active" : ""}`}
             onClick={() => setIsBlurred((v) => !v)}
             title={isBlurred ? "点击恢复显示（退出隐私模式）" : "点击模糊卡片（隐私保护）"}
             style={{
-              fontSize: fs(13),
-              fontWeight: "var(--fw-medium, 500)",
-              color: isBlurred ? "var(--accent)" : "var(--text2)"
+              fontSize: fs(12.5),
+              fontWeight: 600,
+              color: isBlurred ? "var(--accent)" : "var(--text)"
             }}>
-            {isBlurred && (
+            {isBlurred ? (
               <i className="ri-eye-off-line" style={{ fontSize: fs(13) }} />
-            )}
-            {collection.tabs?.length || 0} 个标签
+            ) : collection.locked ? (
+              <i className="ri-lock-fill" style={{ fontSize: fs(12), color: "var(--accent)" }} />
+            ) : null}
+            {normalizedQuery
+              ? `${visibleTabs.length}/${collection.tabs?.length || 0} 页`
+              : `${collection.tabs?.length || 0} 页`}
+          </span>
+          <span className="sy-card-time" title={new Date(collection.timestamp).toLocaleString()}>
+            {formatDate(collection.timestamp)}
           </span>
         </div>
 
@@ -1348,10 +1243,11 @@ function CollectionCard({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
+            gap: 6,
             flexShrink: 0,
             flexWrap: "nowrap"
           }}>
+          <div className={`sy-card-secondary-tools${hasOpenMenu ? " is-open" : ""}`}>
           <IconBtn
             onClick={onToggleLock}
             title={
@@ -1368,7 +1264,13 @@ function CollectionCard({
           </IconBtn>
           <div style={{ position: "relative" }} ref={appearanceRef}>
             <IconBtn
-              onClick={() => setShowAppearancePanel((value) => !value)}
+              onClick={() => {
+                setShowAppearancePanel((value) => {
+                  const next = !value
+                  if (next) setAppearanceTab(appearanceMode)
+                  return next
+                })
+              }}
               title="卡片外观">
               <i className="ri-palette-line"></i>
             </IconBtn>
@@ -1376,127 +1278,190 @@ function CollectionCard({
               <div className="kt-appearance-panel">
                 <div className="kt-appearance-title">
                   <span>卡片外观</span>
-                  <span>主题与背景互斥</span>
-                </div>
-                <div className="kt-background-label">主题</div>
-                <div className="kt-style-grid">
-                  {CARD_STYLES.map((style) => (
-                    <button
-                      key={style.id}
-                      title={`${style.name} · ${style.description}`}
-                      className={`kt-style-option${appearanceMode === "theme" && cardStyle === style.id ? " active" : ""}`}
-                      onClick={() =>
-                        onAppearanceChange({
-                          cardStyle: style.id,
-                          backgroundImage: "",
-                          cardShader: null
-                        })
-                      }>
-                      <span
-                        className="kt-style-preview"
-                        data-preview-style={style.id}>
-                        <span />
-                      </span>
-                      <span className="kt-style-name">{style.name}</span>
-                      <span className="kt-style-description">
-                        {style.description}
-                      </span>
-                    </button>
-                  ))}
+                  <span>
+                    {appearanceMode === "theme"
+                      ? CARD_STYLES.find((s) => s.id === cardStyle)?.name ?? "素瓷"
+                      : appearanceMode === "shader"
+                        ? CARD_SHADERS.find((s) => s.id === cardShader)?.name ?? "动态流光"
+                        : "自定义图片"}
+                  </span>
                 </div>
 
-                <div className="kt-appearance-divider" />
-                <div className="kt-background-label">Shader 背景</div>
-                <div className="kt-shader-grid">
-                  {CARD_SHADERS.map((shader) => (
-                    <button
-                      key={shader.id}
-                      title={`${shader.name} · ${shader.description}`}
-                      className={`kt-shader-option${cardShader === shader.id ? " active" : ""}`}
-                      onClick={() =>
-                        onAppearanceChange({
-                          backgroundImage: "",
-                          cardShader: shader.id
-                        })
-                      }>
-                      <span
-                        className="kt-shader-preview"
-                        data-shader-preview={shader.id}>
-                        <span />
-                      </span>
-                      <span className="kt-style-name">{shader.name}</span>
-                    </button>
-                  ))}
+                <div className="sy-ap-tabs" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={appearanceTab === "theme"}
+                    className={`sy-ap-tab${appearanceTab === "theme" ? " active" : ""}`}
+                    onClick={() => setAppearanceTab("theme")}>
+                    风格主题
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={appearanceTab === "shader"}
+                    className={`sy-ap-tab${appearanceTab === "shader" ? " active" : ""}`}
+                    onClick={() => setAppearanceTab("shader")}>
+                    动态流光
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={appearanceTab === "image"}
+                    className={`sy-ap-tab${appearanceTab === "image" ? " active" : ""}`}
+                    onClick={() => setAppearanceTab("image")}>
+                    图片背景
+                  </button>
                 </div>
-                <a
-                  className="kt-paper-credit"
-                  href="https://shaders.paper.design"
-                  target="_blank"
-                  rel="noreferrer">
-                  Powered by Paper Shaders
-                </a>
 
-                <div className="kt-background-label">图片背景</div>
-                <div className="kt-background-source">
-                  <label
-                    className={`kt-background-upload${uploadingBackground ? " disabled" : ""}`}>
-                    <i className="ri-image-add-line"></i>
-                    {uploadingBackground ? "正在处理…" : "选择本地图片"}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/avif"
-                      disabled={uploadingBackground}
-                      onChange={(e) => {
-                        const file = e.currentTarget.files?.[0]
-                        e.currentTarget.value = ""
-                        void uploadBackground(file)
-                      }}
-                    />
-                  </label>
-                  <span>自动压缩，最大边长 1440px</span>
-                </div>
-                {uploadError && (
-                  <div className="kt-background-error">{uploadError}</div>
+                {appearanceTab === "theme" && (
+                  <div className="kt-style-grid">
+                    {CARD_STYLES.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        title={`${style.name} · ${style.description}`}
+                        className={`kt-style-option${appearanceMode === "theme" && cardStyle === style.id ? " active" : ""}`}
+                        onClick={() =>
+                          onAppearanceChange({
+                            cardStyle: style.id,
+                            backgroundImage: "",
+                            cardShader: null
+                          })
+                        }>
+                        <span
+                          className="kt-style-preview"
+                          data-preview-style={style.id}>
+                          <span />
+                        </span>
+                        <span className="kt-style-name">{style.name}</span>
+                        <span className="kt-style-description">
+                          {style.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 )}
-                <div className="kt-background-or">或使用在线图片</div>
-                <div className="kt-background-row">
-                  <input
-                    id={`bg-${collection.id}`}
-                    value={backgroundDraft}
-                    onChange={(e) => {
-                      setBackgroundDraft(e.target.value)
-                      setBackgroundError(false)
-                      setUploadError("")
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") applyBackground()
-                    }}
-                    placeholder="粘贴图片 URL"
-                    aria-invalid={backgroundError}
-                  />
-                  <button onClick={applyBackground}>应用</button>
-                </div>
-                {backgroundError && (
-                  <div className="kt-background-error">请输入有效的 http(s) 图片地址</div>
+
+                {appearanceTab === "shader" && (
+                  <div>
+                    <div className="kt-shader-grid">
+                      {CARD_SHADERS.map((shader) => (
+                        <button
+                          key={shader.id}
+                          type="button"
+                          title={`${shader.name} · ${shader.description}`}
+                          className={`kt-shader-option${cardShader === shader.id ? " active" : ""}`}
+                          onClick={() =>
+                            onAppearanceChange({
+                              backgroundImage: "",
+                              cardShader: shader.id
+                            })
+                          }>
+                          <span
+                            className="kt-shader-preview"
+                            data-shader-preview={shader.id}>
+                            <span />
+                          </span>
+                          <span className="kt-style-name">{shader.name}</span>
+                          <span className="kt-style-description">
+                            {shader.description}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: 8
+                      }}>
+                      <a
+                        className="kt-paper-credit"
+                        style={{ marginTop: 0 }}
+                        href="https://shaders.paper.design"
+                        target="_blank"
+                        rel="noreferrer">
+                        Powered by Paper Shaders
+                      </a>
+                      {appearanceMode === "shader" && (
+                        <button
+                          type="button"
+                          className="kt-background-clear"
+                          style={{ marginTop: 0 }}
+                          onClick={() =>
+                            onAppearanceChange({ cardShader: null })
+                          }>
+                          停用流光
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
-                {appearanceMode === "image" && (
-                  <button
-                    className="kt-background-clear"
-                    onClick={() => {
-                      setBackgroundDraft("")
-                      setBackgroundError(false)
-                      setUploadError("")
-                      onAppearanceChange({ backgroundImage: "" })
-                    }}>
-                    移除背景图
-                  </button>
-                )}
-                {appearanceMode === "shader" && (
-                  <button
-                    className="kt-background-clear"
-                    onClick={() => onAppearanceChange({ cardShader: null })}>
-                    停用 Shader，恢复主题
-                  </button>
+
+                {appearanceTab === "image" && (
+                  <div>
+                    <div className="kt-background-source">
+                      <label
+                        className={`kt-background-upload${uploadingBackground ? " disabled" : ""}`}>
+                        <i className="ri-image-add-line"></i>
+                        {uploadingBackground ? "正在处理…" : "选择本地图片"}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/avif"
+                          disabled={uploadingBackground}
+                          onChange={(e) => {
+                            const file = e.currentTarget.files?.[0]
+                            e.currentTarget.value = ""
+                            void uploadBackground(file)
+                          }}
+                        />
+                      </label>
+                      <span>自动压缩，最大边长 1440px</span>
+                    </div>
+                    {uploadError && (
+                      <div className="kt-background-error">{uploadError}</div>
+                    )}
+                    <div className="kt-background-or">或使用在线图片</div>
+                    <div className="kt-background-row">
+                      <input
+                        id={`bg-${collection.id}`}
+                        value={backgroundDraft}
+                        onChange={(e) => {
+                          setBackgroundDraft(e.target.value)
+                          setBackgroundError(false)
+                          setUploadError("")
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") applyBackground()
+                        }}
+                        placeholder="粘贴图片 URL"
+                        aria-invalid={backgroundError}
+                      />
+                      <button type="button" onClick={applyBackground}>
+                        应用
+                      </button>
+                    </div>
+                    {backgroundError && (
+                      <div className="kt-background-error">
+                        请输入有效的 http(s) 图片地址
+                      </div>
+                    )}
+                    {appearanceMode === "image" && (
+                      <button
+                        type="button"
+                        className="kt-background-clear"
+                        onClick={() => {
+                          setBackgroundDraft("")
+                          setBackgroundError(false)
+                          setUploadError("")
+                          onAppearanceChange({ backgroundImage: "" })
+                        }}>
+                        移除背景图
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1756,71 +1721,16 @@ function CollectionCard({
               </div>
             </>
           )}
+          <IconBtn onClick={onDelete} title="删除此窗口">
+            <i className="ri-delete-bin-line"></i>
+          </IconBtn>
+          </div>
           <button
             onClick={onOpenAll}
-            style={{
-              width: 32,
-              height: 32,
-              padding: 0,
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "var(--r-s)",
-              fontSize: fs(12.5),
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "var(--font)",
-              flexShrink: 0,
-              transition: "background var(--dur) var(--ease)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 0
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background =
-                "var(--accent2)"
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background =
-                "var(--accent)"
-            }}>
-            <i className="ri-external-link-line"></i>
-          </button>
-          <button
-            onClick={onDelete}
-            style={{
-              width: 32,
-              height: 32,
-              padding: 0,
-              background: "transparent",
-              color: "var(--text3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--r-s)",
-              fontSize: fs(12.5),
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "var(--font)",
-              flexShrink: 0,
-              transition: "all var(--dur) var(--ease)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 0
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = "var(--bg3)"
-              el.style.borderColor = "var(--border2)"
-              el.style.color = "var(--text2)"
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = "transparent"
-              el.style.borderColor = "var(--border)"
-              el.style.color = "var(--text3)"
-            }}>
-            <i className="ri-delete-bin-line"></i>
+            title="全部恢复"
+            className="sy-restore-pill">
+            <i className="ri-external-link-line" style={{ fontSize: 12 }}></i>
+            <span>恢复</span>
           </button>
         </div>
       </div>
@@ -1844,7 +1754,7 @@ function CollectionCard({
             gap: 2,
             padding: "8px 8px"
           }}>
-          {(collection.tabs || []).map((tab, index) => (
+          {visibleTabs.map(({ tab, index }) => (
             <TabItem
               key={`${tab.url}-${index}`}
               tab={tab}
@@ -2490,6 +2400,8 @@ function CollectionPage() {
   const [fontWeight, setFontWeight] = useState<FontWeightValue>(WEIGHT_DEFAULT)
   const [cardRadius, setCardRadius] = useState(RADIUS_DEFAULT)
   const [showFontPanel, setShowFontPanel] = useState(false)
+  const [showPrefsPanel, setShowPrefsPanel] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [theme, setTheme] = useState<Theme>("auto")
   const [beamEnabled, setBeamEnabled] = useState(BEAM_DEFAULT)
   const [cursorEnabled, setCursorEnabled] = useState(false)
@@ -2507,8 +2419,31 @@ function CollectionPage() {
   )
   const [draggingTab, setDraggingTab] = useState<DraggedTab | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const totalTabs = collections.reduce((n, c) => n + (c.tabs?.length || 0), 0)
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const filteredCollections = normalizedSearch
+    ? collections.filter((c) =>
+        (c.tabs || []).some((t) =>
+          `${t.title} ${t.maskedTitle ?? ""} ${t.url}`
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
+      )
+    : collections
+  const matchedTabsCount = normalizedSearch
+    ? filteredCollections.reduce(
+        (n, c) =>
+          n +
+          (c.tabs || []).filter((t) =>
+            `${t.title} ${t.maskedTitle ?? ""} ${t.url}`
+              .toLowerCase()
+              .includes(normalizedSearch)
+          ).length,
+        0
+      )
+    : totalTabs
   const isDark = theme === "dark" || (theme === "auto" && systemIsDark())
   const pageMaxWidth = windowColumns * 500 + (windowColumns - 1) * 12
 
@@ -2631,16 +2566,49 @@ function CollectionPage() {
     }).catch(() => {})
   }, [])
 
-  /* ── Close font panel on outside click ── */
+  /* ── Close top panels on outside click ── */
   useEffect(() => {
-    if (!showFontPanel) return
+    if (!showFontPanel && !showPrefsPanel) return
     const h = (e: MouseEvent) => {
-      if (navRef.current && !navRef.current.contains(e.target as Node))
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setShowFontPanel(false)
+        setShowPrefsPanel(false)
+      }
     }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
-  }, [showFontPanel])
+  }, [showFontPanel, showPrefsPanel])
+
+  /* ── Quick search shortcut: `/` to focus, `Esc` to clear/close ── */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const inEditable =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+
+      if (e.key === "/" && !inEditable && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+      if (e.key === "Escape") {
+        if (showFontPanel) setShowFontPanel(false)
+        if (showPrefsPanel) setShowPrefsPanel(false)
+        if (document.activeElement === searchInputRef.current) {
+          if (searchQuery) {
+            setSearchQuery("")
+          } else {
+            searchInputRef.current?.blur()
+          }
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [showFontPanel, showPrefsPanel, searchQuery])
 
   useEffect(() => {
     if (!soundEnabled) return
@@ -3183,70 +3151,66 @@ function CollectionPage() {
     e.target.value = ""
   }
 
+  const openGuidePage = () => {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("tabs/guide.html"),
+      active: true
+    })
+  }
+
   /* ── Render ── */
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg)",
-        color: "var(--text)"
-      }}>
-      {/* ── Nav ── */}
-      <div
-        ref={navRef}
-        className="kt-nav"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          backdropFilter: "blur(16px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-          borderBottom: "1px solid var(--border)"
-        }}>
+    <div className="sy-shell">
+      {/* ── Floating Island Nav ── */}
+      <div className="sy-nav-wrap">
         <div
-          style={{
-            maxWidth: pageMaxWidth,
-            margin: "0 auto",
-            height: 56,
-            padding: "0 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-          {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NavBtn
-              onClick={toggleTheme}
-              title={isDark ? "切换亮色" : "切换深色"}>
-              <i className={isDark ? "ri-haze-fill" : "ri-moon-foggy-fill"}></i>
-            </NavBtn>
-            <NavBtn
-              onClick={toggleBeam}
-              title={beamEnabled ? "关闭打开动画" : "开启打开动画"}
-              active={beamEnabled}>
-              <i
-                className={
-                  beamEnabled ? "ri-flashlight-fill" : "ri-flashlight-line"
-                }></i>
-            </NavBtn>
-            <NavBtn
-              onClick={toggleCursor}
-              title={cursorEnabled ? "关闭自定义鼠标" : "开启自定义鼠标"}
-              active={cursorEnabled}>
-              <i
-                className={
-                  cursorEnabled ? "ri-cursor-fill" : "ri-cursor-line"
-                }></i>
-            </NavBtn>
-            <NavBtn
-              onClick={toggleSound}
-              title={soundEnabled ? "关闭交互音效" : "开启交互音效"}
-              active={soundEnabled}>
-              <i
-                className={
-                  soundEnabled ? "ri-volume-up-fill" : "ri-volume-mute-line"
-                }></i>
-            </NavBtn>
+          ref={navRef}
+          className="sy-nav-island"
+          style={{ maxWidth: pageMaxWidth }}>
+          {/* Left: Brand + live stats */}
+          <div className="sy-brand">
+            <div className="sy-brand-mark" aria-hidden="true">
+              <i className="ri-bookmark-3-fill"></i>
+            </div>
+            <div>
+              <div className="sy-brand-title">拾页</div>
+              <div className="sy-brand-meta">
+                {normalizedSearch
+                  ? `匹配 ${filteredCollections.length} 组 · ${matchedTabsCount} 页`
+                  : `${collections.length} 组 · ${totalTabs} 页`}
+              </div>
+            </div>
+          </div>
+
+          {/* Center: Instant search */}
+          <div className="sy-search-box">
+            <i className="ri-search-line sy-search-icon" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="sy-search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索标签标题或域名…"
+              aria-label="搜索标签"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                className="sy-search-clear"
+                onClick={() => setSearchQuery("")}
+                title="清空搜索 (Esc)">
+                <i className="ri-close-line" />
+              </button>
+            ) : (
+              <span className="sy-search-kbd" title="按 / 快速搜索">
+                /
+              </span>
+            )}
+          </div>
+
+          {/* Right: Grouped controls */}
+          <div className="sy-toolbar">
             <NavBtn
               onClick={cycleWindowColumns}
               title={`窗口列数：${windowColumns} 列，点击切换`}
@@ -3254,21 +3218,6 @@ function CollectionPage() {
               <span style={{ fontSize: 12, fontWeight: 700 }}>
                 {windowColumns}
               </span>
-            </NavBtn>
-            <NavBtn
-              onClick={toggleCollectMode}
-              title={
-                collectMode === "all"
-                  ? "当前：收集所有窗口 — 点击切换为仅当前窗口"
-                  : "当前：仅收集当前窗口 — 点击切换为所有窗口"
-              }
-              active={collectMode === "current"}>
-              <i
-                className={
-                  collectMode === "all"
-                    ? "ri-stack-fill"
-                    : "ri-window-fill"
-                }></i>
             </NavBtn>
             <NavBtn
               onClick={toggleShowSyncedTabs}
@@ -3279,12 +3228,35 @@ function CollectionPage() {
                   showSyncedTabs ? "ri-device-fill" : "ri-device-line"
                 }></i>
             </NavBtn>
+
+            <span className="sy-nav-sep" />
+
             <NavBtn
-              onClick={() => setShowFontPanel((v) => !v)}
+              onClick={toggleTheme}
+              title={isDark ? "切换亮色" : "切换深色"}>
+              <i className={isDark ? "ri-haze-fill" : "ri-moon-foggy-fill"}></i>
+            </NavBtn>
+            <NavBtn
+              onClick={() => {
+                setShowPrefsPanel(false)
+                setShowFontPanel((v) => !v)
+              }}
               title="外观与字体"
               active={showFontPanel}>
               <i className="ri-font-serif"></i>
             </NavBtn>
+            <NavBtn
+              onClick={() => {
+                setShowFontPanel(false)
+                setShowPrefsPanel((v) => !v)
+              }}
+              title="交互与收集偏好"
+              active={showPrefsPanel}>
+              <i className="ri-equalizer-line"></i>
+            </NavBtn>
+
+            <span className="sy-nav-sep" />
+
             {!loading && collections.length > 0 && (
               <NavBtn onClick={exportData} title="导出全部">
                 <i className="ri-download-2-line" style={{ fontSize: 14 }}></i>
@@ -3302,25 +3274,79 @@ function CollectionPage() {
             />
             {!loading && collections.length > 0 && (
               <NavBtn onClick={clearAll} title="清空全部" danger>
-                <i className="ri-skull-line" style={{ fontSize: 14 }}></i>
+                <i className="ri-delete-bin-6-line" style={{ fontSize: 14 }}></i>
               </NavBtn>
             )}
           </div>
-        </div>
 
-        {/* Font panel */}
-        {showFontPanel && (
-          <FontPicker
-            activeId={fontId}
-            scale={fontScale}
-            weight={fontWeight}
-            radius={cardRadius}
-            onSelectFont={selectFont}
-            onScaleChange={changeFontScale}
-            onWeightChange={changeFontWeight}
-            onRadiusChange={changeCardRadius}
-          />
-        )}
+          {/* Font panel */}
+          {showFontPanel && (
+            <FontPicker
+              activeId={fontId}
+              scale={fontScale}
+              weight={fontWeight}
+              radius={cardRadius}
+              onSelectFont={selectFont}
+              onScaleChange={changeFontScale}
+              onWeightChange={changeFontWeight}
+              onRadiusChange={changeCardRadius}
+            />
+          )}
+
+          {/* Preferences popover */}
+          {showPrefsPanel && (
+            <div className="sy-prefs-panel">
+              <div className="sy-prefs-header">
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>偏好设置</span>
+                <span style={{ fontSize: 11, color: "var(--text3)" }}>即时生效</span>
+              </div>
+
+              <button type="button" className="sy-prefs-row" onClick={toggleBeam}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <i className={beamEnabled ? "ri-flashlight-fill" : "ri-flashlight-line"} style={{ color: beamEnabled ? "var(--accent)" : "var(--text3)" }} />
+                  <span>打开标签光束动画</span>
+                </span>
+                <span className={`sy-switch${beamEnabled ? " is-on" : ""}`} />
+              </button>
+
+              <button type="button" className="sy-prefs-row" onClick={toggleCursor}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <i className={cursorEnabled ? "ri-cursor-fill" : "ri-cursor-line"} style={{ color: cursorEnabled ? "var(--accent)" : "var(--text3)" }} />
+                  <span>自定义丝滑光标</span>
+                </span>
+                <span className={`sy-switch${cursorEnabled ? " is-on" : ""}`} />
+              </button>
+
+              <button type="button" className="sy-prefs-row" onClick={toggleSound}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <i className={soundEnabled ? "ri-volume-up-fill" : "ri-volume-mute-line"} style={{ color: soundEnabled ? "var(--accent)" : "var(--text3)" }} />
+                  <span>交互与滚动音效</span>
+                </span>
+                <span className={`sy-switch${soundEnabled ? " is-on" : ""}`} />
+              </button>
+
+              <button type="button" className="sy-prefs-row" onClick={toggleCollectMode}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <i className={collectMode === "all" ? "ri-stack-fill" : "ri-window-fill"} style={{ color: "var(--accent)" }} />
+                  <span>收集范围</span>
+                </span>
+                <span style={{ fontSize: 11.5, color: "var(--text2)", fontWeight: 600 }}>
+                  {collectMode === "all" ? "所有窗口" : "仅当前窗口"}
+                </span>
+              </button>
+
+              <div style={{ height: 1, background: "var(--border)", margin: "2px 0" }} />
+
+              <button type="button" className="sy-prefs-row" onClick={openGuidePage}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text2)" }}>
+                  <i className="ri-compass-3-line" />
+                  <span>查看动态使用引导</span>
+                </span>
+                <i className="ri-arrow-right-up-line" style={{ fontSize: 13, color: "var(--text3)" }} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -3328,7 +3354,7 @@ function CollectionPage() {
         style={{
           maxWidth: pageMaxWidth,
           margin: "0 auto",
-          padding: "20px 24px 60px"
+          padding: "14px 24px 64px"
         }}>
         {loading && (
           <div
@@ -3351,45 +3377,95 @@ function CollectionPage() {
         )}
 
         {!loading && collections.length === 0 && (
-          <div style={{ textAlign: "center", paddingTop: 100 }}>
-            <div
-              style={{
-                fontSize: 52,
-                marginBottom: 16,
-                color: "var(--border2)"
-              }}>
-              <i className="ri-folder-open-line"></i>
+          <div className="sy-empty-card">
+            <div className="sy-empty-icon">
+              <i className="ri-bookmark-3-line"></i>
             </div>
             <div
               style={{
                 fontSize: fs(17),
                 fontWeight: "var(--fw-strong)",
-                color: "var(--text2)",
-                marginBottom: 6
+                color: "var(--text)",
+                marginBottom: 8
               }}>
-              还没有收集记录
+              书案暂空，静候拾页
             </div>
             <div
               style={{
-                fontSize: fs(13.5),
+                fontSize: fs(13),
                 fontWeight: "var(--fw)",
-                color: "var(--text3)",
-                lineHeight: 1.6
+                color: "var(--text2)",
+                lineHeight: 1.65,
+                marginBottom: 20
               }}>
-              点击扩展图标，一键收集并关闭当前所有标签页
+              点击浏览器工具栏中的「拾页」图标，即可将当前打开的标签页一键归档成整洁卡片。
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+              <button
+                type="button"
+                className="sy-restore-pill"
+                style={{ height: 34, padding: "0 14px", fontSize: 12.5 }}
+                onClick={openGuidePage}>
+                <i className="ri-play-circle-line" style={{ fontSize: 14 }} />
+                <span>查看动态引导</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg)",
+                  color: "var(--text2)",
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "var(--font)"
+                }}>
+                导入备份
+              </button>
             </div>
           </div>
         )}
 
-        {!loading && collections.length > 0 && (
+        {!loading && collections.length > 0 && filteredCollections.length === 0 && (
+          <div className="sy-empty-card">
+            <div className="sy-empty-icon">
+              <i className="ri-search-line"></i>
+            </div>
+            <div
+              style={{
+                fontSize: fs(16),
+                fontWeight: "var(--fw-strong)",
+                color: "var(--text)",
+                marginBottom: 6
+              }}>
+              未找到匹配「{searchQuery}」的标签
+            </div>
+            <div style={{ fontSize: fs(13), color: "var(--text3)", marginBottom: 18 }}>
+              试试更换关键词，或清空搜索查看全部 {totalTabs} 个标签页
+            </div>
+            <button
+              type="button"
+              className="sy-restore-pill"
+              style={{ height: 34, padding: "0 16px", fontSize: 12.5 }}
+              onClick={() => setSearchQuery("")}>
+              清空搜索
+            </button>
+          </div>
+        )}
+
+        {!loading && filteredCollections.length > 0 && (
           <div
             style={{
               display: "grid",
               gridTemplateColumns: `repeat(${windowColumns}, minmax(0, 1fr))`,
-              gap: 12,
+              gap: 14,
               alignItems: "start"
             }}>
-            {collections.map((col) => {
+            {filteredCollections.map((col) => {
               const currentSpan = Math.min(
                 getCollectionSpan(col.id),
                 windowColumns
@@ -3405,6 +3481,7 @@ function CollectionPage() {
                   }}>
                   <CollectionCard
                     collection={col}
+                    searchQuery={searchQuery}
                     currentSpan={currentSpan}
                     maxSpan={windowColumns}
                     onResizeSpan={(newSpan) =>

@@ -113,7 +113,7 @@ function GuidePage() {
   const omniboxText = showCollectionView ? "chrome-extension://shiye/collection.html" : "https://github.com/shiye-tabs"
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+    <div className="sy-shell">
       <div style={{ maxWidth: 880, margin: "0 auto", padding: "40px 24px 56px" }}>
         {/* 顶部标题与当前记录徽章 */}
         <div
@@ -127,19 +127,14 @@ function GuidePage() {
           }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
+              className="sy-brand-mark"
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "var(--accent-bg)",
-                border: "1px solid rgba(217,119,86,.22)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
                 fontSize: 20,
-                color: "var(--accent)",
               }}>
-              <i className="ri-bookmark-3-line"></i>
+              <i className="ri-bookmark-3-fill"></i>
             </div>
             <div>
               <div style={{ fontSize: 22, fontWeight: 650, letterSpacing: "-.01em", lineHeight: 1.25 }}>
