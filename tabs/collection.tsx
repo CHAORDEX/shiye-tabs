@@ -1664,98 +1664,73 @@ function CollectionCard({
                   <i className="ri-game-line"></i>
                 </button>
                 {showGatherMenu && (
-                  <div
-                    className="kt-merge-menu"
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      right: 0,
-                      marginTop: 4,
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--r)",
-                      boxShadow: "var(--shadow-m)",
-                      padding: 4,
-                      minWidth: 160,
-                      zIndex: 10,
-                      maxHeight: 200,
-                      overflowY: "auto"
-                    }}>
-                    <div
-                      style={{
-                        padding: "4px 8px",
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        fontWeight: 500
-                      }}>
-                      归集来源...
+                  <div className="sy-transfer-menu">
+                    <div className="sy-transfer-head">
+                      <span>归集来源窗口</span>
+                      <span>{otherCollections.length} 个可选</span>
                     </div>
                     <button
+                      type="button"
+                      className="sy-transfer-all"
                       onClick={() => {
                         onGather()
                         setShowGatherMenu(false)
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "6px 8px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 4,
-                        fontSize: 12,
-                        color: "var(--accent)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "background var(--dur) var(--ease)"
-                      }}
-                      onMouseEnter={(e) => {
-                        ;(
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "var(--bg2)"
-                      }}
-                      onMouseLeave={(e) => {
-                        ;(
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "transparent"
                       }}>
-                      全部（{otherCollections.reduce((n, c) => n + (c.tabs?.length || 0), 0)}个）
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <i className="ri-stack-line" />
+                        <span>归集全部其他窗口</span>
+                      </span>
+                      <span>
+                        {otherCollections.reduce((n, c) => n + (c.tabs?.length || 0), 0)} 页
+                      </span>
                     </button>
-                    {otherCollections.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          onGather(c.id)
-                          setShowGatherMenu(false)
-                        }}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "6px 8px",
-                          background: "transparent",
-                          border: "none",
-                          borderRadius: 4,
-                          fontSize: 12,
-                          color: "var(--text)",
-                          cursor: "pointer",
-                          transition: "background var(--dur) var(--ease)"
-                        }}
-                        onMouseEnter={(e) => {
-                          ;(
-                            e.currentTarget as HTMLButtonElement
-                          ).style.background = "var(--bg2)"
-                        }}
-                        onMouseLeave={(e) => {
-                          ;(
-                            e.currentTarget as HTMLButtonElement
-                          ).style.background = "transparent"
-                        }}>
-                        {(() => {
-                          const t = c.tabs?.[0]?.title || "";
-                          return t.length > 7 ? t.slice(0, 7) + "…" : t;
-                        })()} ({(c.tabs?.length || 0)}个)
-                      </button>
-                    ))}
+                    {otherCollections.map((c) => {
+                      const firstTab = c.tabs?.[0]
+                      const title =
+                        firstTab?.maskedTitle ||
+                        firstTab?.title?.trim() ||
+                        (firstTab?.url ? getDomain(firstTab.url) : "未命名窗口")
+                      const favicon = firstTab?.url ? getFavicon(firstTab.url) : ""
+                      const host =
+                        !firstTab?.maskedTitle && firstTab?.url
+                          ? getDomain(firstTab.url)
+                          : ""
+                      const tabCount = c.tabs?.length || 0
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="sy-transfer-item"
+                          title={firstTab?.maskedTitle ? title : firstTab?.title || title}
+                          onClick={() => {
+                            onGather(c.id)
+                            setShowGatherMenu(false)
+                          }}>
+                          <span className="sy-transfer-icon">
+                            {favicon ? (
+                              <img
+                                src={favicon}
+                                alt=""
+                                style={{ width: 14, height: 14, borderRadius: 3 }}
+                                onError={(e) => {
+                                  ;(e.currentTarget as HTMLImageElement).style.display = "none"
+                                }}
+                              />
+                            ) : (
+                              <i className="ri-window-line" style={{ fontSize: 12, color: "var(--text3)" }} />
+                            )}
+                          </span>
+                          <span className="sy-transfer-body">
+                            <span className="sy-transfer-title">{title}</span>
+                            <span className="sy-transfer-sub">
+                              {formatDate(c.timestamp)}
+                              {host ? ` · ${host}` : ""}
+                            </span>
+                          </span>
+                          <span className="sy-transfer-count">{tabCount} 页</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -1795,64 +1770,58 @@ function CollectionCard({
                   <i className="ri-game-2-line"></i>
                 </button>
                 {showMergeMenu && (
-                  <div
-                    className="kt-merge-menu"
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      right: 0,
-                      marginTop: 4,
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--r)",
-                      boxShadow: "var(--shadow-m)",
-                      padding: 4,
-                      minWidth: 160,
-                      zIndex: 10,
-                      maxHeight: 200,
-                      overflowY: "auto"
-                    }}>
-                    <div
-                      style={{
-                        padding: "4px 8px",
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        fontWeight: 500
-                      }}>
-                      合并到...
+                  <div className="sy-transfer-menu">
+                    <div className="sy-transfer-head">
+                      <span>投奔到目标窗口</span>
+                      <span>{otherCollections.length} 个可选</span>
                     </div>
-                    {otherCollections.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          onMergeTo(c.id)
-                          setShowMergeMenu(false)
-                        }}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "6px 8px",
-                          background: "transparent",
-                          border: "none",
-                          borderRadius: 4,
-                          fontSize: 12,
-                          color: "var(--text)",
-                          cursor: "pointer",
-                          transition: "background var(--dur) var(--ease)"
-                        }}
-                        onMouseEnter={(e) => {
-                          ;(
-                            e.currentTarget as HTMLButtonElement
-                          ).style.background = "var(--bg2)"
-                        }}
-                        onMouseLeave={(e) => {
-                          ;(
-                            e.currentTarget as HTMLButtonElement
-                          ).style.background = "transparent"
-                        }}>
-                        {formatDate(c.timestamp)} ({c.tabs.length}个)
-                      </button>
-                    ))}
+                    {otherCollections.map((c) => {
+                      const firstTab = c.tabs?.[0]
+                      const title =
+                        firstTab?.maskedTitle ||
+                        firstTab?.title?.trim() ||
+                        (firstTab?.url ? getDomain(firstTab.url) : "未命名窗口")
+                      const favicon = firstTab?.url ? getFavicon(firstTab.url) : ""
+                      const host =
+                        !firstTab?.maskedTitle && firstTab?.url
+                          ? getDomain(firstTab.url)
+                          : ""
+                      const tabCount = c.tabs?.length || 0
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="sy-transfer-item"
+                          title={firstTab?.maskedTitle ? title : firstTab?.title || title}
+                          onClick={() => {
+                            onMergeTo(c.id)
+                            setShowMergeMenu(false)
+                          }}>
+                          <span className="sy-transfer-icon">
+                            {favicon ? (
+                              <img
+                                src={favicon}
+                                alt=""
+                                style={{ width: 14, height: 14, borderRadius: 3 }}
+                                onError={(e) => {
+                                  ;(e.currentTarget as HTMLImageElement).style.display = "none"
+                                }}
+                              />
+                            ) : (
+                              <i className="ri-window-line" style={{ fontSize: 12, color: "var(--text3)" }} />
+                            )}
+                          </span>
+                          <span className="sy-transfer-body">
+                            <span className="sy-transfer-title">{title}</span>
+                            <span className="sy-transfer-sub">
+                              {formatDate(c.timestamp)}
+                              {host ? ` · ${host}` : ""}
+                            </span>
+                          </span>
+                          <span className="sy-transfer-count">{tabCount} 页</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>

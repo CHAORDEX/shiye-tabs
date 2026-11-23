@@ -386,6 +386,132 @@ html[data-theme="dark"] .kt-nav {
   background: var(--card);
 }
 
+/* ── Transfer menu (Gather / Merge) ─────────────────────────── */
+.sy-transfer-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 276px;
+  max-width: calc(100vw - 28px);
+  max-height: 296px;
+  overflow-y: auto;
+  padding: 6px;
+  z-index: 180;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-l);
+  animation: sy-pop-in 160ms var(--ease);
+}
+
+.sy-transfer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+}
+
+.sy-transfer-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  margin-bottom: 4px;
+  border: 1px solid rgba(217, 119, 86, 0.22);
+  border-radius: var(--r-s);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.sy-transfer-all:hover {
+  border-color: var(--accent);
+}
+
+.sy-transfer-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.sy-transfer-item:hover {
+  background: var(--bg2);
+}
+
+.sy-transfer-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sy-transfer-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sy-transfer-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.sy-transfer-sub {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sy-transfer-count {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Card corner resize handles (concentric with window radius) ── */
 .kt-card-corner-handle {
   position: absolute;
