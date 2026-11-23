@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import {
   GrainGradient,
@@ -1022,6 +1023,9 @@ function CollectionCard({
   const [showMergeMenu, setShowMergeMenu] = useState(false)
   const [showGatherMenu, setShowGatherMenu] = useState(false)
   const [showAppearancePanel, setShowAppearancePanel] = useState(false)
+  const [appearanceTab, setAppearanceTab] = useState<"theme" | "shader" | "image">(
+    "theme"
+  )
   const cardRef = useRef<HTMLDivElement>(null)
   const [backgroundDraft, setBackgroundDraft] = useState(() =>
     collection.backgroundImage?.startsWith("data:")
@@ -1034,6 +1038,11 @@ function CollectionCard({
   const mergeMenuRef = useRef<HTMLDivElement>(null)
   const gatherMenuRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLDivElement>(null)
+  const appearancePanelRef = useRef<HTMLDivElement>(null)
+  const [appearancePos, setAppearancePos] = useState<{
+    top: number
+    left: number
+  } | null>(null)
 
   useEffect(() => {
     if (!showMergeMenu) return
@@ -1071,16 +1080,44 @@ function CollectionCard({
 
   useEffect(() => {
     if (!showAppearancePanel) return
+    const updatePosition = () => {
+      const anchor = appearanceRef.current
+      if (!anchor) return
+      const rect = anchor.getBoundingClientRect()
+      const panelWidth = Math.min(348, window.innerWidth - 24)
+      const panelHeight = appearancePanelRef.current?.offsetHeight || 420
+      const margin = 12
+      let left = rect.right - panelWidth
+      left = Math.max(margin, Math.min(window.innerWidth - panelWidth - margin, left))
+      let top = rect.bottom + 8
+      if (top + panelHeight > window.innerHeight - margin) {
+        const above = rect.top - panelHeight - 8
+        top = above >= margin ? above : Math.max(margin, window.innerHeight - panelHeight - margin)
+      }
+      setAppearancePos({ top, left })
+    }
+    updatePosition()
+    const raf = requestAnimationFrame(updatePosition)
     const h = (e: MouseEvent) => {
+      const target = e.target as Node
       if (
-        appearanceRef.current &&
-        !appearanceRef.current.contains(e.target as Node)
-      )
-        setShowAppearancePanel(false)
+        appearanceRef.current?.contains(target) ||
+        appearancePanelRef.current?.contains(target)
+      ) {
+        return
+      }
+      setShowAppearancePanel(false)
     }
     document.addEventListener("mousedown", h)
-    return () => document.removeEventListener("mousedown", h)
-  }, [showAppearancePanel])
+    window.addEventListener("resize", updatePosition)
+    window.addEventListener("scroll", updatePosition, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      document.removeEventListener("mousedown", h)
+      window.removeEventListener("resize", updatePosition)
+      window.removeEventListener("scroll", updatePosition, true)
+    }
+  }, [showAppearancePanel, appearanceTab])
 
   const applyBackground = () => {
     const normalized = normalizeBackgroundUrl(backgroundDraft)
@@ -1113,6 +1150,12 @@ function CollectionCard({
 
   const [isResizing, setIsResizing] = useState(false)
   const [liveSpan, setLiveSpan] = useState<number | null>(null)
+  const [hoveredCorner, setHoveredCorner] = useState<
+    "tl" | "tr" | "bl" | "br" | null
+  >(null)
+  const [activeCorner, setActiveCorner] = useState<
+    "tl" | "tr" | "bl" | "br" | null
+  >(null)
   const cardStyle = normalizeCardStyle(collection.cardStyle)
   const hasCustomBackground = Boolean(collection.backgroundImage)
   const cardShader = normalizeCardShader(collection.cardShader)
@@ -1121,9 +1164,6 @@ function CollectionCard({
     : hasCustomBackground
       ? "image"
       : "theme"
-  const [appearanceTab, setAppearanceTab] = useState<"theme" | "shader" | "image">(
-    appearanceMode
-  )
 
   const handleCornerMouseDown = (
     e: React.MouseEvent,
@@ -1138,10 +1178,12 @@ function CollectionCard({
     const cardEl = cardRef.current
     if (!cardEl) return
     const cardRect = cardEl.getBoundingClientRect()
+    const gridEl = cardEl.closest(".sy-collections-grid")
     const parentWidth =
+      gridEl?.getBoundingClientRect().width ||
       cardEl.parentElement?.parentElement?.getBoundingClientRect().width ||
       cardRect.width
-    const calculatedColWidth = (parentWidth - (maxSpan - 1) * 12) / maxSpan
+    const calculatedColWidth = (parentWidth - (maxSpan - 1) * 14) / maxSpan
     const colWidth =
       calculatedColWidth > 60
         ? calculatedColWidth
@@ -1151,6 +1193,7 @@ function CollectionCard({
     let lastAppliedSpan = initialSpan
 
     setIsResizing(true)
+    setActiveCorner(corner)
     setLiveSpan(initialSpan)
     const cursorStyle =
       corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize"
@@ -1172,7 +1215,7 @@ function CollectionCard({
 
       const delta = Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : deltaY
       const targetWidth = initialWidth + delta
-      const rawSpan = Math.round((targetWidth + 12) / (colWidth + 12))
+      const rawSpan = Math.round((targetWidth + 14) / (colWidth + 14))
       // 范围：最小1列，最大总列数 maxSpan
       const targetSpan = Math.max(1, Math.min(maxSpan, rawSpan))
 
@@ -1185,6 +1228,7 @@ function CollectionCard({
 
     const handleMouseUp = () => {
       setIsResizing(false)
+      setActiveCorner(null)
       setLiveSpan(null)
       document.body.style.cursor = prevCursor
       document.body.style.userSelect = prevUserSelect
@@ -1230,14 +1274,14 @@ function CollectionCard({
       onMouseLeave={() => setHCard(false)}
       style={{
         position: "relative",
-        zIndex: hasOpenMenu ? 100 : 1,
+        zIndex: hasOpenMenu ? 100 : isResizing ? 60 : 1,
         background: "var(--card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--r)",
         boxShadow: hCard ? "var(--shadow-m)" : "var(--shadow-s)",
         transition:
           "box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease)",
-        transform: hCard ? "translateY(-1px)" : "translateY(0)"
+        transform: hCard && !isResizing ? "translateY(-1px)" : "translateY(0)"
       }}>
       <div
         className="kt-card-visual"
@@ -1325,8 +1369,16 @@ function CollectionCard({
               title="卡片外观">
               <i className="ri-palette-line"></i>
             </IconBtn>
-            {showAppearancePanel && (
-              <div className="kt-appearance-panel">
+            {showAppearancePanel &&
+              appearancePos &&
+              createPortal(
+                <div
+                  ref={appearancePanelRef}
+                  className="kt-appearance-panel"
+                  style={{
+                    top: appearancePos.top,
+                    left: appearancePos.left
+                  }}>
                 <div className="kt-appearance-title">
                   <span>卡片外观</span>
                   <span>
@@ -1547,8 +1599,9 @@ function CollectionCard({
                     )}
                   </div>
                 )}
-              </div>
-            )}
+                </div>,
+                document.body
+              )}
           </div>
           <IconBtn
             onClick={onToggleLinkColumns}
@@ -1873,6 +1926,25 @@ function CollectionCard({
         )}
       </div>
 
+      {/* ── Corner resize handles (aligned with window corner curves) ── */}
+      {maxSpan > 1 && (
+        <>
+          {(["tl", "tr", "bl", "br"] as const).map((corner) => (
+            <div
+              key={corner}
+              className={`kt-card-corner-handle kt-card-corner-${corner}${activeCorner === corner || hoveredCorner === corner ? " is-active" : ""}`}
+              title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
+              onMouseEnter={() => setHoveredCorner(corner)}
+              onMouseLeave={() =>
+                setHoveredCorner((prev) => (prev === corner ? null : prev))
+              }
+              onMouseDown={(e) => handleCornerMouseDown(e, corner)}
+              onDoubleClick={handleCornerDoubleClick}
+            />
+          ))}
+        </>
+      )}
+
       {/* ── Resize HUD indicator ── */}
       {isResizing && (
         <div className="kt-card-resize-hud" aria-live="polite">
@@ -1894,36 +1966,6 @@ function CollectionCard({
             )}
           </div>
         </div>
-      )}
-
-      {/* ── Corner resize handles ── */}
-      {maxSpan > 1 && (
-        <>
-          <div
-            className="kt-card-corner-handle kt-card-corner-tl"
-            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
-            onMouseDown={(e) => handleCornerMouseDown(e, "tl")}
-            onDoubleClick={handleCornerDoubleClick}
-          />
-          <div
-            className="kt-card-corner-handle kt-card-corner-tr"
-            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
-            onMouseDown={(e) => handleCornerMouseDown(e, "tr")}
-            onDoubleClick={handleCornerDoubleClick}
-          />
-          <div
-            className="kt-card-corner-handle kt-card-corner-bl"
-            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
-            onMouseDown={(e) => handleCornerMouseDown(e, "bl")}
-            onDoubleClick={handleCornerDoubleClick}
-          />
-          <div
-            className="kt-card-corner-handle kt-card-corner-br"
-            title="拖拽调整卡片宽度（1列至最大列数，双击重置为1列）"
-            onMouseDown={(e) => handleCornerMouseDown(e, "br")}
-            onDoubleClick={handleCornerDoubleClick}
-          />
-        </>
       )}
     </div>
   )
@@ -3543,6 +3585,7 @@ function CollectionPage() {
 
         {!loading && filteredCollections.length > 0 && (
           <div
+            className="sy-collections-grid"
             style={{
               display: "grid",
               gridTemplateColumns: `repeat(${windowColumns}, minmax(0, 1fr))`,
